@@ -1,9 +1,10 @@
 import { Crepe } from '@milkdown/crepe';
-import { replaceAll } from '@milkdown/utils';
+import { insert, replaceAll } from '@milkdown/utils';
 import '@milkdown/crepe/theme/classic.css';
 import './styles/editor.css';
 import type { HostToWebviewMessage } from '../shared/protocol';
 import { WebviewBridge } from './bridge';
+import { createImageMarkdown } from './markdown';
 import { enhanceMermaidBlocks } from './plugins/mermaid-block';
 import { createSyncPlugin, type SyncPluginHandle } from './plugins/sync-plugin';
 
@@ -41,6 +42,9 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
     case 'hostError':
       statusRoot.textContent = message.message;
       statusRoot.dataset.visible = 'true';
+      return;
+    case 'imageInserted':
+      insertImageAtSelection(message.alt, message.path);
       return;
   }
 }
@@ -136,6 +140,17 @@ function attachDropHandler(root: HTMLElement): void {
     };
     reader.readAsDataURL(file);
   };
+}
+
+function insertImageAtSelection(alt: string, path: string): void {
+  if (!editor) {
+    return;
+  }
+
+  statusRoot.textContent = '';
+  statusRoot.dataset.visible = 'false';
+  editor.editor.action(insert(createImageMarkdown(alt, path)));
+  void enhanceMermaidBlocks(editorRoot);
 }
 
 function getRequiredElement<T extends HTMLElement>(id: string): T {

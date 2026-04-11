@@ -16,6 +16,7 @@ The project currently ships an MVP scaffold for a VS Code custom Markdown editor
 - Markdown persistence is currently full-document replacement
 - Mermaid rendering is post-processed in the WebView
 - Image drag and drop writes files into a sibling `assets/` directory
+- Dropped images are inserted at the current editor selection
 - Type checks, build, and unit tests are in place
 
 ## Implemented Structure
@@ -31,6 +32,7 @@ The project currently ships an MVP scaffold for a VS Code custom Markdown editor
   - Applies CSP
   - Wires message passing
   - Handles dropped image persistence
+  - Sends inserted image metadata back to the WebView
 
 - `src/sync/document-sync.ts`
   - Owns document-to-webview synchronization
@@ -59,6 +61,7 @@ The project currently ships an MVP scaffold for a VS Code custom Markdown editor
   - Connects sync plugin and bridge
   - Applies external updates through Milkdown `replaceAll`
   - Defers external updates while IME composition is active
+  - Inserts dropped images at the current selection
 
 - `src/webview/plugins/sync-plugin.ts`
   - Debounces editor changes
@@ -205,11 +208,9 @@ Planned next step:
 Current limitation:
 
 - dropped images are always written to a local `assets/` folder beside the document
-- inserted Markdown is appended near the end of the file, not at the visual drop position
 
 Planned next step:
 
-- insert at the current selection
 - allow configurable asset paths
 
 ### Versioning model
@@ -244,8 +245,8 @@ If continuing the MVP, the next highest-value items are:
 
 1. Replace full-document persistence with block-level patch generation.
 2. Turn Mermaid handling into a proper editor feature instead of DOM post-processing.
-3. Improve image insertion so it uses the current cursor or block position.
-4. Add integration tests using `@vscode/test-electron`.
+3. Add integration tests using `@vscode/test-electron`.
+4. Make image asset output paths configurable.
 
 ## Remaining Tasks
 
@@ -262,7 +263,6 @@ This section is the practical backlog from the current state of the codebase.
 ### Medium priority
 
 - Replace Mermaid DOM post-processing with a first-class editor integration.
-- Insert dropped images at the current editing position instead of appending near the end of the file.
 - Make image asset output path configurable.
 - Add graceful handling for malformed Markdown or parser failures.
 - Improve readonly handling when panels lose focus or become inactive.

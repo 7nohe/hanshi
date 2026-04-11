@@ -54,7 +54,7 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
           await sync.applyWebviewEdit(message);
           return;
         case 'dropImage':
-          await this.handleDropImage(document, sync, message);
+          await this.handleDropImage(document, message, webview);
           return;
       }
     });
@@ -74,8 +74,8 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
 
   private async handleDropImage(
     document: vscode.TextDocument,
-    sync: DocumentSync,
     message: DropImageMessage,
+    webview: vscode.Webview,
   ): Promise<void> {
     const match = message.dataUrl.match(/^data:(.+);base64,(.+)$/);
 
@@ -97,7 +97,11 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
     await vscode.workspace.fs.writeFile(imageUri, bytes);
 
     const relativePath = path.relative(path.dirname(document.uri.fsPath), imageUri.fsPath).split(path.sep).join('/');
-    await sync.insertImageReference(relativePath);
+    await webview.postMessage({
+      type: 'imageInserted',
+      alt: parsed.name || 'image',
+      path: relativePath,
+    } satisfies HostToWebviewMessage);
   }
 
   private getHtmlForWebview(webview: vscode.Webview): string {

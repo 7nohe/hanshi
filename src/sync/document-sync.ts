@@ -51,16 +51,6 @@ export class DocumentSync {
     }
   }
 
-  public async insertImageReference(relativePath: string): Promise<void> {
-    const imageMarkdown = `\n![${relativePath}](${relativePath})\n`;
-    const edit = new vscode.WorkspaceEdit();
-    const lastLineIndex = Math.max(this.document.lineCount - 1, 0);
-    const lastLine = this.document.lineAt(lastLineIndex);
-    edit.insert(this.document.uri, new vscode.Position(lastLineIndex, lastLine.text.length), imageMarkdown);
-    this.tracker.mark(this.document.version + 1);
-    await vscode.workspace.applyEdit(edit);
-  }
-
   public async handleDocumentChange(event: vscode.TextDocumentChangeEvent): Promise<void> {
     if (this.tracker.consume(event.document.version)) {
       return;
