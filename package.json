@@ -1,0 +1,62 @@
+{
+  "name": "hanshi",
+  "displayName": "Hanshi",
+  "description": "Typora-inspired WYSIWYG Markdown editor for VS Code.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onCustomEditor:hanshi.markdownEditor"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "hanshi.markdownEditor",
+        "displayName": "Hanshi Markdown Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "hanshi.open",
+        "title": "Open With Hanshi"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
+    "test": "vitest run",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@milkdown/crepe": "^7.20.0",
+    "@types/node": "^22.15.3",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.4.1",
+    "esbuild": "^0.25.3",
+    "mermaid": "^11.6.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "typescript": "^5.8.3",
+    "unified": "^11.0.5",
+    "vitest": "^1.6.1"
+  }
+}

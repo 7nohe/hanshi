@@ -1,0 +1,9 @@
+dist-types/**
+src/**
+test/**
+.vscode/**
+*.md
+tsconfig*.json
+esbuild.mjs
+vitest.config.*
+npm-debug.log*
