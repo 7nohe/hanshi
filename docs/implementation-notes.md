@@ -6,6 +6,52 @@ This document records what has actually been implemented so far, why specific de
 
 The source of truth for planned scope is still [implementation-plan.md](../implementation-plan.md). This file exists to capture the gap between the original plan and the code that now exists.
 
+## Product Direction
+
+Hanshi is no longer treated as a generic WYSIWYG Markdown editor project.
+
+After comparing the existing extension `vscode-markdown-live-editor`, the intended direction is now:
+
+- not a feature race against existing Milkdown editors
+- not a Typora clone for VS Code
+- a docs-as-code editor that prioritizes source fidelity, stable diffs, and Japanese IME safety
+
+This means Hanshi should prefer:
+
+- deterministic persistence over UI breadth
+- minimal and targeted `WorkspaceEdit` ranges over full reserialization
+- stable coexistence with formatters, lint rules, and hand-edited Markdown
+- feature work only when it does not compromise source preservation
+
+## Comparison With Existing Extension
+
+The existing repository `vscode-markdown-live-editor` is ahead in editor features:
+
+- outline panel
+- in-editor find
+- heading folding
+- selection toolbar and link tooltip
+- KaTeX
+- Mermaid editing UI
+- slash commands
+- emoji shortcode
+- custom CSS
+- export HTML
+- VS Code Web support
+
+Hanshi is currently ahead in persistence-oriented areas:
+
+- version-aware sync instead of short-lived echo suppression by content equality
+- targeted replacement ranges instead of unconditional full-document replacement
+- block-aware replacement for contiguous top-level changes
+- explicit IME composition deferral
+- ongoing work toward stricter source fidelity
+
+The practical conclusion is:
+
+- existing extension for general-purpose editor richness
+- Hanshi for source-faithful specification and design document workflows
+
 ## Current Status
 
 The project currently ships an MVP scaffold for a VS Code custom Markdown editor:
@@ -257,9 +303,9 @@ Current test coverage is intentionally narrow and only covers pure logic:
 
 If continuing the MVP, the next highest-value items are:
 
-1. Replace full-document persistence with block-level patch generation.
-2. Turn Mermaid handling into a proper editor feature instead of DOM post-processing.
-3. Add integration tests using `@vscode/test-electron`.
+1. Preserve unchanged blocks even more aggressively across structural edits.
+2. Strengthen frontmatter-safe persistence rules for docs-as-code use cases.
+3. Make the integration test suite pass in a stable environment.
 4. Make image asset output paths configurable.
 
 ## Remaining Tasks
