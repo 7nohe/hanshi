@@ -42,6 +42,12 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
     case 'hostError':
       statusRoot.textContent = message.message;
       statusRoot.dataset.visible = 'true';
+      statusRoot.dataset.kind = 'error';
+      return;
+    case 'hostNotice':
+      statusRoot.textContent = message.message;
+      statusRoot.dataset.visible = 'true';
+      statusRoot.dataset.kind = 'notice';
       return;
     case 'imageInserted':
       insertImageAtSelection(message.alt, message.path);
@@ -79,6 +85,7 @@ async function mountEditor(markdown: string): Promise<void> {
     onMarkdownChange: (nextMarkdown, version) => {
       statusRoot.textContent = '';
       statusRoot.dataset.visible = 'false';
+      statusRoot.dataset.kind = '';
       bridge.postMessage({
         type: 'edit',
         markdown: nextMarkdown,
@@ -149,6 +156,7 @@ function insertImageAtSelection(alt: string, path: string): void {
 
   statusRoot.textContent = '';
   statusRoot.dataset.visible = 'false';
+  statusRoot.dataset.kind = '';
   editor.editor.action(insert(createImageMarkdown(alt, path)));
   void enhanceMermaidBlocks(editorRoot);
 }

@@ -22,6 +22,11 @@ export interface HostErrorMessage {
   message: string;
 }
 
+export interface HostNoticeMessage {
+  type: 'hostNotice';
+  message: string;
+}
+
 export interface ImageInsertedMessage {
   type: 'imageInserted';
   alt: string;
@@ -33,6 +38,7 @@ export type HostToWebviewMessage =
   | ExternalUpdateMessage
   | SetReadonlyMessage
   | HostErrorMessage
+  | HostNoticeMessage
   | ImageInsertedMessage;
 
 export interface EditMessage extends MarkdownSnapshot {

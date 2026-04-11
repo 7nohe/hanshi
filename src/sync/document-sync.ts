@@ -8,6 +8,7 @@ interface DocumentSyncOptions {
   document: vscode.TextDocument;
   postMessage: (message: HostToWebviewMessage) => Promise<void>;
   onError: (error: Error) => void;
+  onWarning: (warning: string) => void;
 }
 
 export class DocumentSync {
@@ -38,14 +39,18 @@ export class DocumentSync {
         return;
       }
 
-      const edit = createFullDocumentEdit(this.document, message.markdown);
+      const result = createFullDocumentEdit(this.document, message.markdown);
 
-      if (!edit) {
+      if (result.warning) {
+        this.options.onWarning(result.warning);
+      }
+
+      if (!result.edit) {
         return;
       }
 
       this.tracker.mark(this.document.version + 1);
-      await vscode.workspace.applyEdit(edit);
+      await vscode.workspace.applyEdit(result.edit);
     } catch (error) {
       this.options.onError(asError(error));
     }

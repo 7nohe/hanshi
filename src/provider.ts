@@ -28,6 +28,12 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
       postMessage: async (message) => {
         await webview.postMessage(message);
       },
+      onWarning: (warning) => {
+        void webview.postMessage({
+          type: 'hostNotice',
+          message: warning,
+        } satisfies HostToWebviewMessage);
+      },
       onError: (error) => {
         void vscode.window.showErrorMessage(error.message);
         void webview.postMessage({
@@ -46,16 +52,25 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
     });
 
     webview.onDidReceiveMessage(async (message: WebviewToHostMessage) => {
-      switch (message.type) {
-        case 'ready':
-          await sync.bootstrap(webviewPanel.active);
-          return;
-        case 'edit':
-          await sync.applyWebviewEdit(message);
-          return;
-        case 'dropImage':
-          await this.handleDropImage(document, message, webview);
-          return;
+      try {
+        switch (message.type) {
+          case 'ready':
+            await sync.bootstrap(webviewPanel.active);
+            return;
+          case 'edit':
+            await sync.applyWebviewEdit(message);
+            return;
+          case 'dropImage':
+            await this.handleDropImage(document, message, webview);
+            return;
+        }
+      } catch (error) {
+        const resolved = error instanceof Error ? error : new Error(String(error));
+        void vscode.window.showErrorMessage(resolved.message);
+        void webview.postMessage({
+          type: 'hostError',
+          message: resolved.message,
+        } satisfies HostToWebviewMessage);
       }
     });
 

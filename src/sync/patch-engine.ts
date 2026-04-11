@@ -1,5 +1,10 @@
 import * as vscode from 'vscode';
-import { normalizeMarkdown } from './markdown-normalizer';
+import { safeNormalizeMarkdown } from './markdown-normalizer';
+
+export interface PatchEngineResult {
+  edit?: vscode.WorkspaceEdit;
+  warning?: string;
+}
 
 export function getFullDocumentRange(document: vscode.TextDocument): vscode.Range {
   const lastLineIndex = Math.max(document.lineCount - 1, 0);
@@ -10,14 +15,20 @@ export function getFullDocumentRange(document: vscode.TextDocument): vscode.Rang
 export function createFullDocumentEdit(
   document: vscode.TextDocument,
   markdown: string,
-): vscode.WorkspaceEdit | undefined {
-  const next = normalizeMarkdown(markdown);
+): PatchEngineResult {
+  const result = safeNormalizeMarkdown(markdown);
+  const next = result.markdown;
 
   if (document.getText() === next) {
-    return undefined;
+    return {
+      warning: result.warning,
+    };
   }
 
   const edit = new vscode.WorkspaceEdit();
   edit.replace(document.uri, getFullDocumentRange(document), next);
-  return edit;
+  return {
+    edit,
+    warning: result.warning,
+  };
 }
