@@ -14,11 +14,10 @@ export interface SyncPluginHandle {
 
 export function createSyncPlugin(editor: Crepe, options: SyncPluginOptions): SyncPluginHandle {
   let composing = false;
-  let suspended = false;
   let pendingTimer: number | undefined;
 
   const flush = () => {
-    if (composing || suspended) {
+    if (composing) {
       return;
     }
 
@@ -45,7 +44,7 @@ export function createSyncPlugin(editor: Crepe, options: SyncPluginOptions): Syn
 
   editor.on((listener) => {
     listener.markdownUpdated((_ctx, markdown) => {
-      if (composing || suspended) {
+      if (composing) {
         return;
       }
 

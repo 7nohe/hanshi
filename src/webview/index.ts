@@ -128,7 +128,7 @@ function attachDropHandler(root: HTMLElement): void {
     event.preventDefault();
     const file = event.dataTransfer?.files?.[0];
 
-    if (!file || !file.type.startsWith('image/')) {
+    if (!file?.type.startsWith('image/')) {
       return;
     }
 

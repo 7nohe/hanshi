@@ -34,6 +34,12 @@ Type-check:
 bun run check
 ```
 
+Lint:
+
+```bash
+bun run lint
+```
+
 Run unit tests:
 
 ```bash
@@ -72,6 +78,7 @@ Avoid adding complex behavior that:
 At minimum, run:
 
 ```bash
+bun run lint
 bun run check
 bun test
 bun run build

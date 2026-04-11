@@ -51,6 +51,12 @@ Run static checks:
 bun run check
 ```
 
+Run lint:
+
+```bash
+bun run lint
+```
+
 Run unit tests:
 
 ```bash
