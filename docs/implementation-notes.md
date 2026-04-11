@@ -14,6 +14,7 @@ The project currently ships an MVP scaffold for a VS Code custom Markdown editor
 - WebView side uses Milkdown Crepe
 - Editing sync is wired in both directions
 - Markdown persistence is currently full-document replacement
+- Applied `WorkspaceEdit` ranges are now reduced to the smallest changed span after normalization
 - Mermaid rendering is post-processed in the WebView
 - Image drag and drop writes files into a sibling `assets/` directory
 - Dropped images are inserted at the current editor selection
@@ -41,8 +42,11 @@ The project currently ships an MVP scaffold for a VS Code custom Markdown editor
   - Rejects stale webview edits and forces a fresh external sync
 
 - `src/sync/patch-engine.ts`
-  - Generates a full-document `WorkspaceEdit`
+  - Generates a minimal replacement `WorkspaceEdit` from normalized Markdown
   - Delegates normalization to the Markdown normalizer
+
+- `src/sync/text-diff.ts`
+  - Computes the smallest changed text span between current and next content
 
 - `src/sync/markdown-normalizer.ts`
   - Uses `remark-parse` + `remark-stringify`
@@ -88,16 +92,19 @@ This keeps VS Code `TextDocument` as the canonical source. Undo, dirty tracking,
 
 ### 2. Full-document replacement for Phase 1
 
-The current patch engine intentionally replaces the whole document after WebView edits. This is not ideal for diff quality, but it makes the first milestone much simpler and keeps the data model deterministic.
+The first patch engine replaced the whole document after WebView edits. That was simple, but it created broader document changes than necessary.
+
+The current patch engine still normalizes the entire Markdown string, but it now reduces the applied `WorkspaceEdit` to the smallest changed span using prefix/suffix matching.
 
 Accepted tradeoff:
 
 - opening and saving a file can normalize Markdown formatting
-- git diffs may contain unrelated formatting churn
+- git diffs may still contain unrelated formatting churn if normalization rewrites structure broadly
 
 Reason this was accepted:
 
 - it unblocks end-to-end editing quickly
+- it improves edit locality without yet implementing AST-aware patching
 - source-fidelity work is easier to layer later than basic sync plumbing
 
 ### 3. remark-based normalization on the extension side
@@ -191,7 +198,7 @@ Current limitation:
 
 Planned next step:
 
-- replace full-document save with block-level patching based on mdast positions
+- replace normalized-string diffing with block-level patching based on mdast positions
 
 ### Mermaid UX
 
