@@ -6,29 +6,41 @@ export interface FrontmatterEntry {
 }
 
 export interface FrontmatterState {
+  block: string;
   raw: string;
   title?: string;
   entries: FrontmatterEntry[];
   parseError?: string;
 }
 
-export function parseFrontmatter(markdown: string): FrontmatterState | undefined {
+export interface SplitMarkdownResult {
+  frontmatter?: FrontmatterState;
+  body: string;
+}
+
+export function splitMarkdownFrontmatter(markdown: string): SplitMarkdownResult {
   const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
 
   if (!match) {
-    return undefined;
+    return { body: markdown };
   }
 
+  const block = match[0];
   const raw = match[1] ?? '';
+  const body = markdown.slice(block.length);
 
   try {
     const document = YAML.parseDocument(raw);
 
     if (document.errors.length > 0) {
       return {
-        raw,
-        entries: [],
-        parseError: document.errors[0]?.message ?? 'Failed to parse YAML frontmatter.',
+        body,
+        frontmatter: {
+          block,
+          raw,
+          entries: [],
+          parseError: document.errors[0]?.message ?? 'Failed to parse YAML frontmatter.',
+        },
       };
     }
 
@@ -36,13 +48,17 @@ export function parseFrontmatter(markdown: string): FrontmatterState | undefined
 
     if (!isRecord(data)) {
       return {
-        raw,
-        entries: [
-          {
-            key: 'value',
-            value: summarizeValue(data),
-          },
-        ],
+        body,
+        frontmatter: {
+          block,
+          raw,
+          entries: [
+            {
+              key: 'value',
+              value: summarizeValue(data),
+            },
+          ],
+        },
       };
     }
 
@@ -54,17 +70,29 @@ export function parseFrontmatter(markdown: string): FrontmatterState | undefined
     const title = typeof data.title === 'string' ? data.title : undefined;
 
     return {
-      raw,
-      title,
-      entries,
+      body,
+      frontmatter: {
+        block,
+        raw,
+        title,
+        entries,
+      },
     };
   } catch (error) {
     return {
-      raw,
-      entries: [],
-      parseError: error instanceof Error ? error.message : String(error),
+      body,
+      frontmatter: {
+        block,
+        raw,
+        entries: [],
+        parseError: error instanceof Error ? error.message : String(error),
+      },
     };
   }
+}
+
+export function mergeFrontmatter(frontmatterBlock: string | undefined, body: string): string {
+  return frontmatterBlock ? `${frontmatterBlock}${body}` : body;
 }
 
 function summarizeValue(value: unknown): string {

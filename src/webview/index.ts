@@ -5,7 +5,7 @@ import '@milkdown/crepe/theme/classic.css';
 import './styles/editor.css';
 import type { HostToWebviewMessage } from '../shared/protocol';
 import { WebviewBridge } from './bridge';
-import { parseFrontmatter, type FrontmatterState } from './frontmatter';
+import { mergeFrontmatter, splitMarkdownFrontmatter, type FrontmatterState } from './frontmatter';
 import { createImageMarkdown } from './markdown';
 import { enhanceMermaidBlocks } from './plugins/mermaid-block';
 import { createSyncPlugin, type SyncPluginHandle } from './plugins/sync-plugin';
@@ -23,6 +23,7 @@ let syncPlugin: SyncPluginHandle | undefined;
 let currentVersion = 0;
 let currentEditable = true;
 let pendingExternalUpdate: string | undefined;
+let currentFrontmatter: FrontmatterState | undefined;
 
 frontmatterToggle.addEventListener('click', () => {
   const expanded = frontmatterRoot.dataset.expanded === 'true';
@@ -68,6 +69,9 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
 }
 
 async function mountEditor(markdown: string): Promise<void> {
+  const { frontmatter, body } = splitMarkdownFrontmatter(markdown);
+  currentFrontmatter = frontmatter;
+
   if (editor) {
     syncPlugin?.dispose();
     await editor.destroy();
@@ -76,12 +80,12 @@ async function mountEditor(markdown: string): Promise<void> {
   editorRoot.replaceChildren();
   editor = new Crepe({
     root: editorRoot,
-    defaultValue: markdown,
+    defaultValue: body,
   });
 
   await editor.create();
   editor.setReadonly(!currentEditable);
-  renderFrontmatter(markdown);
+  renderFrontmatter(currentFrontmatter);
 
   syncPlugin = createSyncPlugin(editor, {
     root: editorRoot,
@@ -99,10 +103,10 @@ async function mountEditor(markdown: string): Promise<void> {
       statusRoot.textContent = '';
       statusRoot.dataset.visible = 'false';
       statusRoot.dataset.kind = '';
-      renderFrontmatter(nextMarkdown);
+      renderFrontmatter(currentFrontmatter);
       bridge.postMessage({
         type: 'edit',
-        markdown: nextMarkdown,
+        markdown: mergeFrontmatter(currentFrontmatter?.block, nextMarkdown),
         version,
       });
       currentVersion = Math.max(currentVersion, version + 1);
@@ -121,15 +125,17 @@ async function replaceEditorContent(markdown: string): Promise<void> {
   }
 
   pendingExternalUpdate = undefined;
+  const { frontmatter, body } = splitMarkdownFrontmatter(markdown);
+  currentFrontmatter = frontmatter;
 
   if (!editor) {
     await mountEditor(markdown);
     return;
   }
 
-  editor.editor.action(replaceAll(markdown, false));
+  editor.editor.action(replaceAll(body, false));
   editor.setReadonly(!currentEditable);
-  renderFrontmatter(markdown);
+  renderFrontmatter(currentFrontmatter);
   await enhanceMermaidBlocks(editorRoot);
 }
 
@@ -176,9 +182,7 @@ function insertImageAtSelection(alt: string, path: string): void {
   void enhanceMermaidBlocks(editorRoot);
 }
 
-function renderFrontmatter(markdown: string): void {
-  const state = parseFrontmatter(markdown);
-
+function renderFrontmatter(state: FrontmatterState | undefined): void {
   if (!state) {
     frontmatterRoot.dataset.visible = 'false';
     frontmatterRoot.dataset.expanded = 'false';

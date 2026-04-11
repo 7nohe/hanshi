@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { parseFrontmatter } from '../../src/webview/frontmatter';
+import { mergeFrontmatter, splitMarkdownFrontmatter } from '../../src/webview/frontmatter';
 
-describe('parseFrontmatter', () => {
-  it('returns undefined when the document has no leading frontmatter', () => {
-    expect(parseFrontmatter('# Hanshi')).toBeUndefined();
+describe('splitMarkdownFrontmatter', () => {
+  it('returns the original body when the document has no leading frontmatter', () => {
+    expect(splitMarkdownFrontmatter('# Hanshi')).toEqual({
+      body: '# Hanshi',
+    });
   });
 
   it('extracts summary entries from YAML frontmatter', () => {
-    const state = parseFrontmatter(`---
+    const result = splitMarkdownFrontmatter(`---
 title: Sample
 status: draft
 tags:
@@ -20,8 +22,9 @@ metadata:
 # Body
 `);
 
-    expect(state?.title).toBe('Sample');
-    expect(state?.entries).toEqual([
+    expect(result.body).toBe('\n# Body\n');
+    expect(result.frontmatter?.title).toBe('Sample');
+    expect(result.frontmatter?.entries).toEqual([
       { key: 'title', value: 'Sample' },
       { key: 'status', value: 'draft' },
       { key: 'tags', value: 'docs, specs' },
@@ -30,12 +33,30 @@ metadata:
   });
 
   it('keeps raw YAML and surfaces parse errors', () => {
-    const state = parseFrontmatter(`---
+    const result = splitMarkdownFrontmatter(`---
 title: [oops
 ---
 `);
 
-    expect(state?.raw).toContain('title: [oops');
-    expect(state?.parseError).toBeDefined();
+    expect(result.frontmatter?.raw).toContain('title: [oops');
+    expect(result.frontmatter?.parseError).toBeDefined();
+  });
+});
+
+describe('mergeFrontmatter', () => {
+  it('recombines frontmatter and body without duplicating content', () => {
+    const result = splitMarkdownFrontmatter(`---
+title: Sample
+---
+
+# Body
+`);
+
+    expect(mergeFrontmatter(result.frontmatter?.block, result.body)).toBe(`---
+title: Sample
+---
+
+# Body
+`);
   });
 });
