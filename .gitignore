@@ -3,3 +3,4 @@ node_modules
 dist
 .agents/plans
 .vscode-test
+.serena

@@ -201,14 +201,70 @@ body {
 
 .hanshi-mermaid-preview {
   margin: 12px 0 20px;
-  padding: 16px;
   border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--hanshi-bg) 94%, white 6%);
-  overflow: auto;
+  overflow: hidden;
+}
+
+.hanshi-mermaid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--hanshi-border) 60%, transparent);
+  user-select: none;
+}
+
+.hanshi-mermaid-btn {
+  border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--hanshi-fg);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  line-height: 1.4;
+}
+
+.hanshi-mermaid-btn:hover {
+  background: var(--hanshi-hover);
+}
+
+.hanshi-mermaid-zoom-label {
+  font-size: 11px;
+  color: var(--hanshi-muted);
+  min-width: 40px;
+  text-align: center;
+}
+
+.hanshi-mermaid-viewport {
+  overflow: hidden;
+  cursor: grab;
+  min-height: 120px;
+  max-height: min(480px, 65vh);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.hanshi-mermaid-viewport:active {
+  cursor: grabbing;
+}
+
+#editor .milkdown .hanshi-mermaid-preview img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  max-height: min(420px, 60vh);
+  transform-origin: center center;
+  pointer-events: none;
 }
 
 .hanshi-mermaid-preview.is-error {
+  padding: 16px;
   color: var(--hanshi-error);
   white-space: pre-wrap;
 }

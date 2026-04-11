@@ -1,4 +1,4 @@
-import { Crepe } from '@milkdown/crepe';
+import { Crepe, CrepeFeature } from '@milkdown/crepe';
 import { insert, replaceAll } from '@milkdown/utils';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/classic.css';
@@ -7,7 +7,7 @@ import type { HostToWebviewMessage } from '../shared/protocol';
 import { WebviewBridge } from './bridge';
 import { mergeFrontmatter, splitMarkdownFrontmatter, type FrontmatterState } from './frontmatter';
 import { createImageMarkdown } from './markdown';
-import { enhanceMermaidBlocks } from './plugins/mermaid-block';
+import { renderMermaidPreview } from './plugins/mermaid-block';
 import { createSyncPlugin, type SyncPluginHandle } from './plugins/sync-plugin';
 
 const bridge = new WebviewBridge();
@@ -81,6 +81,13 @@ async function mountEditor(markdown: string): Promise<void> {
   editor = new Crepe({
     root: editorRoot,
     defaultValue: body,
+    featureConfigs: {
+      [CrepeFeature.CodeMirror]: {
+        renderPreview: renderMermaidPreview,
+        previewOnlyByDefault: true,
+        previewLabel: 'Diagram Preview',
+      },
+    },
   });
 
   await editor.create();
@@ -110,12 +117,10 @@ async function mountEditor(markdown: string): Promise<void> {
         version,
       });
       currentVersion = Math.max(currentVersion, version + 1);
-      void enhanceMermaidBlocks(editorRoot);
     },
   });
 
   attachDropHandler(editorRoot);
-  await enhanceMermaidBlocks(editorRoot);
 }
 
 async function replaceEditorContent(markdown: string): Promise<void> {
@@ -136,7 +141,6 @@ async function replaceEditorContent(markdown: string): Promise<void> {
   editor.editor.action(replaceAll(body, false));
   editor.setReadonly(!currentEditable);
   renderFrontmatter(currentFrontmatter);
-  await enhanceMermaidBlocks(editorRoot);
 }
 
 function attachDropHandler(root: HTMLElement): void {
@@ -179,7 +183,6 @@ function insertImageAtSelection(alt: string, path: string): void {
   statusRoot.dataset.visible = 'false';
   statusRoot.dataset.kind = '';
   editor.editor.action(insert(createImageMarkdown(alt, path)));
-  void enhanceMermaidBlocks(editorRoot);
 }
 
 function renderFrontmatter(state: FrontmatterState | undefined): void {
