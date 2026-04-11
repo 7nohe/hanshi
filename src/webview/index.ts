@@ -1,4 +1,6 @@
 import { Crepe, CrepeFeature } from '@milkdown/crepe';
+import { editorViewCtx } from '@milkdown/kit/core';
+import { TextSelection } from '@milkdown/kit/prose/state';
 import { insert, replaceAll } from '@milkdown/utils';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/classic.css';
@@ -22,6 +24,12 @@ let editor: Crepe | undefined;
 let syncPlugin: SyncPluginHandle | undefined;
 let currentVersion = 0;
 let currentEditable = true;
+interface SelectionSnapshot {
+  anchor: number;
+  head: number;
+  hadFocus: boolean;
+}
+
 let pendingExternalUpdate: string | undefined;
 let currentFrontmatter: FrontmatterState | undefined;
 
@@ -138,9 +146,50 @@ async function replaceEditorContent(markdown: string): Promise<void> {
     return;
   }
 
+  const selectionSnapshot = captureSelectionSnapshot();
   editor.editor.action(replaceAll(body, false));
+  restoreSelectionSnapshot(selectionSnapshot);
   editor.setReadonly(!currentEditable);
   renderFrontmatter(currentFrontmatter);
+}
+
+function captureSelectionSnapshot(): SelectionSnapshot | undefined {
+  if (!editor) {
+    return undefined;
+  }
+
+  return editor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    return {
+      anchor: view.state.selection.anchor,
+      head: view.state.selection.head,
+      hadFocus: view.hasFocus(),
+    };
+  });
+}
+
+function restoreSelectionSnapshot(snapshot: SelectionSnapshot | undefined): void {
+  if (!editor || !snapshot || !snapshot.hadFocus) {
+    return;
+  }
+
+  editor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const maxPosition = view.state.doc.content.size;
+    const anchor = clampPosition(snapshot.anchor, maxPosition);
+    const head = clampPosition(snapshot.head, maxPosition);
+    const selection = TextSelection.between(
+      view.state.doc.resolve(anchor),
+      view.state.doc.resolve(head),
+    );
+
+    view.dispatch(view.state.tr.setSelection(selection));
+    view.focus();
+  });
+}
+
+function clampPosition(position: number, maxPosition: number): number {
+  return Math.max(0, Math.min(position, maxPosition));
 }
 
 function attachDropHandler(root: HTMLElement): void {
