@@ -123,7 +123,7 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
       <div id="editor"></div>
       <div id="status" aria-live="polite"></div>
     </div>
-    <script nonce="${nonce}" src="${scriptUri}"></script>
+    <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
   </body>
 </html>`;
   }

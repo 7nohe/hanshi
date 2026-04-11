@@ -19,14 +19,16 @@ const extensionConfig = {
 const webviewConfig = {
   entryPoints: ['src/webview/index.ts'],
   bundle: true,
-  format: 'iife',
+  format: 'esm',
   platform: 'browser',
   target: 'chrome114',
   outdir: 'dist/webview',
   entryNames: 'index',
+  chunkNames: 'chunks/[name]-[hash]',
   assetNames: 'assets/[name]-[hash]',
   sourcemap: true,
   minify: false,
+  splitting: true,
   logLevel: 'info',
   loader: {
     '.css': 'css',

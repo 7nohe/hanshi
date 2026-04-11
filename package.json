@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@milkdown/crepe": "^7.20.0",
+    "@milkdown/utils": "^7.20.0",
     "@types/node": "^22.15.3",
     "@types/vscode": "^1.85.0",
     "@vscode/test-electron": "^2.4.1",

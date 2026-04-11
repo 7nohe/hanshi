@@ -1,4 +1,5 @@
 import { Crepe } from '@milkdown/crepe';
+import { replaceAll } from '@milkdown/utils';
 import '@milkdown/crepe/theme/classic.css';
 import './styles/editor.css';
 import type { HostToWebviewMessage } from '../shared/protocol';
@@ -14,6 +15,7 @@ let editor: Crepe | undefined;
 let syncPlugin: SyncPluginHandle | undefined;
 let currentVersion = 0;
 let currentEditable = true;
+let pendingExternalUpdate: string | undefined;
 
 bridge.onMessage((message) => {
   void handleMessage(message);
@@ -61,6 +63,15 @@ async function mountEditor(markdown: string): Promise<void> {
   syncPlugin = createSyncPlugin(editor, {
     root: editorRoot,
     getVersion: () => currentVersion,
+    onCompositionEnd: () => {
+      if (!pendingExternalUpdate) {
+        return;
+      }
+
+      const next = pendingExternalUpdate;
+      pendingExternalUpdate = undefined;
+      void replaceEditorContent(next);
+    },
     onMarkdownChange: (nextMarkdown, version) => {
       statusRoot.textContent = '';
       statusRoot.dataset.visible = 'false';
@@ -69,6 +80,7 @@ async function mountEditor(markdown: string): Promise<void> {
         markdown: nextMarkdown,
         version,
       });
+      currentVersion = Math.max(currentVersion, version + 1);
       void enhanceMermaidBlocks(editorRoot);
     },
   });
@@ -78,7 +90,21 @@ async function mountEditor(markdown: string): Promise<void> {
 }
 
 async function replaceEditorContent(markdown: string): Promise<void> {
-  await mountEditor(markdown);
+  if (syncPlugin?.isComposing()) {
+    pendingExternalUpdate = markdown;
+    return;
+  }
+
+  pendingExternalUpdate = undefined;
+
+  if (!editor) {
+    await mountEditor(markdown);
+    return;
+  }
+
+  editor.editor.action(replaceAll(markdown, false));
+  editor.setReadonly(!currentEditable);
+  await enhanceMermaidBlocks(editorRoot);
 }
 
 function attachDropHandler(root: HTMLElement): void {

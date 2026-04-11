@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { EditMessage, HostToWebviewMessage } from '../shared/protocol';
 import { createFullDocumentEdit } from './patch-engine';
 import { PendingVersionTracker } from './pending-version-tracker';
+import { isStaleEditVersion } from './versioning';
 
 interface DocumentSyncOptions {
   document: vscode.TextDocument;
@@ -28,6 +29,15 @@ export class DocumentSync {
 
   public async applyWebviewEdit(message: EditMessage): Promise<void> {
     try {
+      if (isStaleEditVersion(message.version, this.document.version)) {
+        await this.options.postMessage({
+          type: 'externalUpdate',
+          markdown: this.document.getText(),
+          version: this.document.version,
+        });
+        return;
+      }
+
       const edit = createFullDocumentEdit(this.document, message.markdown);
 
       if (!edit) {
