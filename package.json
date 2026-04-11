@@ -41,7 +41,7 @@
     "watch": "node esbuild.mjs --watch",
     "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
     "test": "vitest run",
-    "vscode:prepublish": "npm run build"
+    "vscode:prepublish": "bun run build"
   },
   "devDependencies": {
     "@milkdown/crepe": "^7.20.0",
