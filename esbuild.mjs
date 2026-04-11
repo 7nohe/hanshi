@@ -32,6 +32,9 @@ const webviewConfig = {
   logLevel: 'info',
   loader: {
     '.css': 'css',
+    '.woff2': 'file',
+    '.woff': 'file',
+    '.ttf': 'file',
   },
 };
 

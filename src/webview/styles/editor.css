@@ -2,10 +2,13 @@
   color-scheme: light dark;
   --hanshi-bg: var(--vscode-editor-background);
   --hanshi-fg: var(--vscode-editor-foreground);
-  --hanshi-muted: color-mix(in srgb, var(--hanshi-fg) 48%, transparent);
+  --hanshi-muted: var(--vscode-descriptionForeground);
   --hanshi-border: var(--vscode-panel-border);
-  --hanshi-surface: color-mix(in srgb, var(--hanshi-bg) 88%, white 12%);
-  --hanshi-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
+  --hanshi-accent: var(--vscode-textLink-foreground);
+  --hanshi-error: var(--vscode-errorForeground);
+  --hanshi-hover: var(--vscode-list-hoverBackground);
+  --hanshi-selected: var(--vscode-list-activeSelectionBackground);
+  --hanshi-inline-code: var(--vscode-textPreformat-foreground);
 }
 
 html,
@@ -18,39 +21,71 @@ body,
 
 body {
   overflow: hidden;
-  background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--vscode-textLink-foreground) 18%, transparent), transparent 30%),
-    linear-gradient(180deg, color-mix(in srgb, var(--hanshi-bg) 96%, black 4%), var(--hanshi-bg));
+  background: var(--hanshi-bg);
   color: var(--hanshi-fg);
   font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
 }
 
 #app {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 #editor {
   overflow: auto;
-  padding: 24px;
+  padding: 16px 24px 24px;
 }
 
 #editor .milkdown {
-  max-width: 900px;
+  --crepe-color-background: var(--hanshi-bg);
+  --crepe-color-on-background: var(--hanshi-fg);
+  --crepe-color-surface: var(--hanshi-bg);
+  --crepe-color-surface-low: color-mix(in srgb, var(--hanshi-bg) 92%, white 8%);
+  --crepe-color-on-surface: var(--hanshi-fg);
+  --crepe-color-on-surface-variant: var(--hanshi-muted);
+  --crepe-color-outline: color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+  --crepe-color-primary: var(--hanshi-accent);
+  --crepe-color-secondary: color-mix(in srgb, var(--hanshi-accent) 12%, var(--hanshi-bg));
+  --crepe-color-on-secondary: var(--hanshi-fg);
+  --crepe-color-inverse: var(--hanshi-fg);
+  --crepe-color-on-inverse: var(--hanshi-bg);
+  --crepe-color-inline-code: var(--hanshi-inline-code);
+  --crepe-color-error: var(--hanshi-error);
+  --crepe-color-hover: var(--hanshi-hover);
+  --crepe-color-selected: var(--hanshi-selected);
+  --crepe-color-inline-area: color-mix(in srgb, var(--hanshi-accent) 10%, var(--hanshi-bg));
+  --crepe-font-default: var(--vscode-font-family);
+  --crepe-font-code: var(--vscode-editor-font-family);
+  max-width: 920px;
   min-height: calc(100vh - 96px);
   margin: 0 auto;
-  background: var(--hanshi-surface);
-  border: 1px solid color-mix(in srgb, var(--hanshi-border) 70%, transparent);
-  border-radius: 20px;
-  box-shadow: var(--hanshi-shadow);
-  padding: 48px 56px;
+}
+
+#editor .milkdown .ProseMirror {
+  min-height: calc(100vh - 160px);
+  color: var(--hanshi-fg);
+  caret-color: var(--hanshi-accent);
+}
+
+#editor .milkdown .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+}
+
+#editor .milkdown .ProseMirror a {
+  color: var(--hanshi-accent);
+}
+
+#editor .milkdown .ProseMirror code {
+  color: var(--hanshi-inline-code);
 }
 
 #status {
   min-height: 24px;
   padding: 0 24px 12px;
   font-size: 12px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--hanshi-muted);
   opacity: 0;
   transition: opacity 160ms ease;
 }
@@ -60,23 +95,23 @@ body {
 }
 
 #status[data-kind='error'] {
-  color: var(--vscode-errorForeground);
+  color: var(--hanshi-error);
 }
 
 #status[data-kind='notice'] {
-  color: var(--vscode-descriptionForeground);
+  color: var(--hanshi-muted);
 }
 
 .hanshi-mermaid-preview {
   margin: 12px 0 20px;
   padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--hanshi-border) 75%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--hanshi-bg) 92%, white 8%);
+  border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hanshi-bg) 94%, white 6%);
   overflow: auto;
 }
 
 .hanshi-mermaid-preview.is-error {
-  color: var(--vscode-errorForeground);
+  color: var(--hanshi-error);
   white-space: pre-wrap;
 }

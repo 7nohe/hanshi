@@ -1,5 +1,6 @@
 import { Crepe } from '@milkdown/crepe';
 import { insert, replaceAll } from '@milkdown/utils';
+import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/classic.css';
 import './styles/editor.css';
 import type { HostToWebviewMessage } from '../shared/protocol';
