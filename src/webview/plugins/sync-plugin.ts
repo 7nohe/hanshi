@@ -4,6 +4,8 @@ export interface SyncPluginOptions {
   root: HTMLElement;
   getVersion: () => number;
   onMarkdownChange: (markdown: string, version: number) => void;
+  onUserInput?: () => void;
+  onCompositionStart?: () => void;
   onCompositionEnd?: () => void;
 }
 
@@ -31,10 +33,12 @@ export function createSyncPlugin(editor: Crepe, options: SyncPluginOptions): Syn
 
   const onCompositionStart = () => {
     composing = true;
+    options.onCompositionStart?.();
   };
 
   const onCompositionEnd = () => {
     composing = false;
+    options.onUserInput?.();
     options.onCompositionEnd?.();
     schedule();
   };
@@ -48,6 +52,7 @@ export function createSyncPlugin(editor: Crepe, options: SyncPluginOptions): Syn
         return;
       }
 
+      options.onUserInput?.();
       window.clearTimeout(pendingTimer);
       pendingTimer = window.setTimeout(() => {
         options.onMarkdownChange(markdown, options.getVersion());

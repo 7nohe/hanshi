@@ -31,7 +31,17 @@
         "command": "hanshi.open",
         "title": "Open With Hanshi"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Hanshi",
+      "properties": {
+        "hanshi.aiCompletions.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable AI inline completions in the Hanshi editor when a GitHub Copilot model is available."
+        }
+      }
+    }
   },
   "scripts": {
     "build": "node esbuild.mjs",

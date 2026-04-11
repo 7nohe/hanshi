@@ -1,18 +1,20 @@
 import { Crepe, CrepeFeature } from '@milkdown/crepe';
-import { editorViewCtx } from '@milkdown/kit/core';
-import { TextSelection } from '@milkdown/kit/prose/state';
+import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
+import { Selection, TextSelection } from '@milkdown/kit/prose/state';
 import { insert, replaceAll } from '@milkdown/utils';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/classic.css';
 import './styles/editor.css';
 import type { HostToWebviewMessage } from '../shared/protocol';
 import { WebviewBridge } from './bridge';
+import { CompletionController } from './completion';
 import { mergeFrontmatter, splitMarkdownFrontmatter, type FrontmatterState } from './frontmatter';
 import { createImageMarkdown } from './markdown';
 import { renderMermaidPreview } from './plugins/mermaid-block';
 import { createSyncPlugin, type SyncPluginHandle } from './plugins/sync-plugin';
 
 const bridge = new WebviewBridge();
+const workspaceRoot = getRequiredElement<HTMLElement>('workspace');
 const editorRoot = getRequiredElement<HTMLElement>('editor');
 const frontmatterRoot = getRequiredElement<HTMLElement>('frontmatter');
 const frontmatterSummary = getRequiredElement<HTMLElement>('frontmatter-summary');
@@ -22,16 +24,34 @@ const statusRoot = getRequiredElement<HTMLElement>('status');
 
 let editor: Crepe | undefined;
 let syncPlugin: SyncPluginHandle | undefined;
+let completionController: CompletionController | undefined;
 let currentVersion = 0;
 let currentEditable = true;
+let pendingExternalUpdate: string | undefined;
+let currentFrontmatter: FrontmatterState | undefined;
+let hasPendingLocalChanges = false;
+let requestSequence = 0;
+
 interface SelectionSnapshot {
   anchor: number;
   head: number;
   hadFocus: boolean;
 }
 
-let pendingExternalUpdate: string | undefined;
-let currentFrontmatter: FrontmatterState | undefined;
+const pendingImageSaveRequests = new Map<
+  string,
+  {
+    resolve: (value: { alt: string; path: string }) => void;
+    reject: (reason?: unknown) => void;
+  }
+>();
+const pendingImageSrcRequests = new Map<
+  string,
+  {
+    resolve: (value: string) => void;
+    reject: (reason?: unknown) => void;
+  }
+>();
 
 frontmatterToggle.addEventListener('click', () => {
   const expanded = frontmatterRoot.dataset.expanded === 'true';
@@ -49,16 +69,19 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
   switch (message.type) {
     case 'init':
       currentVersion = message.version;
+      hasPendingLocalChanges = false;
       currentEditable = message.editable;
       await mountEditor(message.markdown);
       return;
     case 'externalUpdate':
       currentVersion = message.version;
+      hasPendingLocalChanges = false;
       await replaceEditorContent(message.markdown);
       return;
     case 'setReadonly':
       currentEditable = message.editable;
       editor?.setReadonly(!message.editable);
+      completionController?.onReadonlyChange(message.editable);
       return;
     case 'hostError':
       statusRoot.textContent = message.message;
@@ -70,8 +93,17 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
       statusRoot.dataset.visible = 'true';
       statusRoot.dataset.kind = 'notice';
       return;
-    case 'imageInserted':
-      insertImageAtSelection(message.alt, message.path);
+    case 'saveImageResult':
+      settleImageSaveRequest(message);
+      return;
+    case 'resolveImageSrcResult':
+      settleImageSrcRequest(message);
+      return;
+    case 'completionResult':
+      completionController?.applyCompletionResult(message);
+      return;
+    case 'completionCleared':
+      completionController?.clearFromHost(message);
       return;
   }
 }
@@ -82,6 +114,7 @@ async function mountEditor(markdown: string): Promise<void> {
 
   if (editor) {
     syncPlugin?.dispose();
+    completionController?.dispose();
     await editor.destroy();
   }
 
@@ -95,17 +128,43 @@ async function mountEditor(markdown: string): Promise<void> {
         previewOnlyByDefault: true,
         previewLabel: 'Diagram Preview',
       },
+      [CrepeFeature.ImageBlock]: {
+        onUpload: async (file) => {
+          const saved = await saveImageFile(file);
+          return saved.path;
+        },
+        proxyDomURL: (src) => {
+          return resolveImageSource(src);
+        },
+      },
     },
   });
 
   await editor.create();
   editor.setReadonly(!currentEditable);
   renderFrontmatter(currentFrontmatter);
+  completionController = new CompletionController({
+    root: editorRoot,
+    scrollContainer: workspaceRoot,
+    getMarkdown: () => mergeFrontmatter(currentFrontmatter?.block, editor?.getMarkdown() ?? ''),
+    getVersion: () => getEditorVersion(),
+    getEditable: () => currentEditable,
+    postMessage: (message) => {
+      bridge.postMessage(message);
+    },
+    insertText: (text) => {
+      insertTextAtSelection(text);
+    },
+  });
 
   syncPlugin = createSyncPlugin(editor, {
     root: editorRoot,
     getVersion: () => currentVersion,
+    onCompositionStart: () => {
+      completionController?.onCompositionStart();
+    },
     onCompositionEnd: () => {
+      completionController?.onCompositionEnd();
       if (!pendingExternalUpdate) {
         return;
       }
@@ -114,7 +173,12 @@ async function mountEditor(markdown: string): Promise<void> {
       pendingExternalUpdate = undefined;
       void replaceEditorContent(next);
     },
+    onUserInput: () => {
+      hasPendingLocalChanges = true;
+      completionController?.onUserInput();
+    },
     onMarkdownChange: (nextMarkdown, version) => {
+      const nextVersion = Math.max(currentVersion, version + 1);
       statusRoot.textContent = '';
       statusRoot.dataset.visible = 'false';
       statusRoot.dataset.kind = '';
@@ -122,9 +186,10 @@ async function mountEditor(markdown: string): Promise<void> {
       bridge.postMessage({
         type: 'edit',
         markdown: mergeFrontmatter(currentFrontmatter?.block, nextMarkdown),
-        version,
+        version: nextVersion,
       });
-      currentVersion = Math.max(currentVersion, version + 1);
+      currentVersion = nextVersion;
+      hasPendingLocalChanges = false;
     },
   });
 
@@ -132,6 +197,8 @@ async function mountEditor(markdown: string): Promise<void> {
 }
 
 async function replaceEditorContent(markdown: string): Promise<void> {
+  completionController?.onExternalUpdate();
+
   if (syncPlugin?.isComposing()) {
     pendingExternalUpdate = markdown;
     return;
@@ -205,21 +272,13 @@ function attachDropHandler(root: HTMLElement): void {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-
-      if (typeof result !== 'string') {
-        return;
-      }
-
-      bridge.postMessage({
-        type: 'dropImage',
-        name: file.name,
-        dataUrl: result,
+    void saveImageFile(file)
+      .then(({ alt, path }) => {
+        insertImageAtSelection(alt, path);
+      })
+      .catch((error) => {
+        showStatus(error instanceof Error ? error.message : String(error), 'error');
       });
-    };
-    reader.readAsDataURL(file);
   };
 }
 
@@ -228,10 +287,185 @@ function insertImageAtSelection(alt: string, path: string): void {
     return;
   }
 
+  clearStatus();
+  editor.editor.action(insert(createImageMarkdown(alt, path)));
+}
+
+async function saveImageFile(file: File): Promise<{ alt: string; path: string }> {
+  const dataUrl = await readFileAsDataUrl(file);
+  const requestId = nextRequestId('save-image');
+
+  return new Promise((resolve, reject) => {
+    pendingImageSaveRequests.set(requestId, { resolve, reject });
+    bridge.postMessage({
+      type: 'saveImageRequest',
+      requestId,
+      name: file.name,
+      dataUrl,
+    });
+  });
+}
+
+async function resolveImageSource(src: string): Promise<string> {
+  if (!src || /^(?:https?:|data:|blob:|vscode-webview:)/i.test(src)) {
+    return src;
+  }
+
+  const requestId = nextRequestId('resolve-image');
+
+  return new Promise((resolve, reject) => {
+    pendingImageSrcRequests.set(requestId, { resolve, reject });
+    bridge.postMessage({
+      type: 'resolveImageSrcRequest',
+      requestId,
+      src,
+    });
+  });
+}
+
+function settleImageSaveRequest(
+  message: Extract<HostToWebviewMessage, { type: 'saveImageResult' }>,
+): void {
+  const pending = pendingImageSaveRequests.get(message.requestId);
+
+  if (!pending) {
+    return;
+  }
+
+  pendingImageSaveRequests.delete(message.requestId);
+
+  if (message.error || !message.alt || !message.path) {
+    pending.reject(new Error(message.error ?? 'Image upload failed.'));
+    return;
+  }
+
+  pending.resolve({
+    alt: message.alt,
+    path: message.path,
+  });
+}
+
+function settleImageSrcRequest(
+  message: Extract<HostToWebviewMessage, { type: 'resolveImageSrcResult' }>,
+): void {
+  const pending = pendingImageSrcRequests.get(message.requestId);
+
+  if (!pending) {
+    return;
+  }
+
+  pendingImageSrcRequests.delete(message.requestId);
+
+  if (message.error || !message.resolvedSrc) {
+    pending.reject(new Error(message.error ?? 'Failed to resolve image source.'));
+    return;
+  }
+
+  pending.resolve(message.resolvedSrc);
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => {
+      reject(reader.error ?? new Error('Failed to read image file.'));
+    };
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Image payload is not a valid data URL.'));
+        return;
+      }
+
+      resolve(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function nextRequestId(prefix: string): string {
+  requestSequence += 1;
+  return `${prefix}-${requestSequence}`;
+}
+
+function getEditorVersion(): number {
+  return hasPendingLocalChanges ? currentVersion + 1 : currentVersion;
+}
+
+function clearStatus(): void {
   statusRoot.textContent = '';
   statusRoot.dataset.visible = 'false';
   statusRoot.dataset.kind = '';
-  editor.editor.action(insert(createImageMarkdown(alt, path)));
+}
+
+function showStatus(message: string, kind: 'error' | 'notice'): void {
+  statusRoot.textContent = message;
+  statusRoot.dataset.visible = 'true';
+  statusRoot.dataset.kind = kind;
+}
+
+function insertTextAtSelection(text: string): void {
+  if (!text) {
+    return;
+  }
+
+  const activeElement = document.activeElement;
+
+  if (activeElement instanceof HTMLTextAreaElement || activeElement instanceof HTMLInputElement) {
+    const start = activeElement.selectionStart ?? activeElement.value.length;
+    const end = activeElement.selectionEnd ?? start;
+    activeElement.setRangeText(text, start, end, 'end');
+    activeElement.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }));
+    return;
+  }
+
+  if (applyBlockMarkdownCompletion(text)) {
+    return;
+  }
+
+  editor?.editor.action(insert(text, true));
+}
+
+function applyBlockMarkdownCompletion(markdown: string): boolean {
+  if (!editor) {
+    return false;
+  }
+
+  const selection = window.getSelection();
+  const anchorNode = selection?.anchorNode;
+  const anchorElement = anchorNode instanceof HTMLElement ? anchorNode : anchorNode?.parentElement;
+
+  if (anchorElement?.closest('.cm-editor, .cm-content, .cm-line')) {
+    return false;
+  }
+
+  return editor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const parser = ctx.get(parserCtx);
+    const parsed = parser(markdown);
+    const node = parsed?.firstChild;
+    const { selection } = view.state;
+    const { $from } = selection;
+
+    if (
+      !parsed ||
+      parsed.childCount !== 1 ||
+      !node ||
+      !selection.empty ||
+      $from.parent.type.name === 'code_block' ||
+      !$from.parent.isTextblock ||
+      $from.parent.textContent.length > 0
+    ) {
+      return false;
+    }
+
+    const from = $from.before();
+    const to = from + $from.parent.nodeSize;
+    const tr = view.state.tr.replaceRangeWith(from, to, node);
+    const selectionPos = Math.max(from + 1, from + node.nodeSize - 1);
+    tr.setSelection(Selection.near(tr.doc.resolve(selectionPos), -1)).scrollIntoView();
+    view.dispatch(tr);
+    return true;
+  });
 }
 
 function renderFrontmatter(state: FrontmatterState | undefined): void {

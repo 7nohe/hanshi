@@ -33,6 +33,7 @@ body {
 }
 
 #workspace {
+  position: relative;
   overflow: auto;
   padding: 16px 24px 24px;
 }
@@ -197,6 +198,31 @@ body {
 
 #status[data-kind='notice'] {
   color: var(--hanshi-muted);
+}
+
+.hanshi-inline-completion {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--hanshi-muted) 80%, transparent);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  opacity: 0;
+  transform: translateY(-1px);
+}
+
+.hanshi-inline-completion[data-visible='true'] {
+  opacity: 1;
+}
+
+#editor[data-inline-completion-visible='true'] .crepe-placeholder::before,
+#editor[data-inline-completion-visible='true'] [data-placeholder]::before {
+  opacity: 0;
+}
+
+#editor .milkdown .milkdown-table-block th,
+#editor .milkdown .milkdown-table-block td {
+  border-color: var(--hanshi-border);
 }
 
 .hanshi-mermaid-preview {
