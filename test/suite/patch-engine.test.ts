@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { computeBlockReplaceRange, computeReplaceRange } from '../../src/sync/block-diff';
 import { normalizeMarkdown, safeNormalizeMarkdown } from '../../src/sync/markdown-normalizer';
 
 describe('normalizeMarkdown', () => {
@@ -25,5 +26,24 @@ describe('normalizeMarkdown', () => {
     expect(result.didFallback).toBe(true);
     expect(result.markdown).toBe('abc\n');
     expect(result.warning).toContain('normalization failed');
+  });
+});
+
+describe('computeReplaceRange', () => {
+  it('replaces a single changed top-level block span', () => {
+    const current = '# Title\n\nOne\n\nTwo\n';
+    const next = '# Title\n\nChanged\n\nTwo\n';
+    expect(computeBlockReplaceRange(current, next)).toEqual({
+      start: 9,
+      end: 14,
+      text: 'Changed\n\n',
+    });
+  });
+
+  it('falls back when changed blocks are non-contiguous', () => {
+    const current = '# A\n\nOne\n\nTwo\n';
+    const next = '# B\n\nOne\n\nThree\n';
+    expect(computeBlockReplaceRange(current, next)).toBeUndefined();
+    expect(computeReplaceRange(current, next)).toBeDefined();
   });
 });

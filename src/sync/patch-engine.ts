@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
+import { computeReplaceRange } from './block-diff';
 import { safeNormalizeMarkdown } from './markdown-normalizer';
-import { computeMinimalReplaceRange } from './text-diff';
 
 export interface PatchEngineResult {
   edit?: vscode.WorkspaceEdit;
@@ -26,7 +26,7 @@ export function createFullDocumentEdit(
     };
   }
 
-  const replaceRange = computeMinimalReplaceRange(document.getText(), next);
+  const replaceRange = computeReplaceRange(document.getText(), next);
 
   if (!replaceRange) {
     return {

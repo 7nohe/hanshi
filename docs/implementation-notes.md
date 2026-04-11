@@ -51,6 +51,9 @@ The project currently ships an MVP scaffold for a VS Code custom Markdown editor
 - `src/sync/block-map.ts`
   - Extracts top-level mdast blocks with original source offsets
 
+- `src/sync/block-diff.ts`
+  - Prefers contiguous top-level block replacement before falling back to plain text diffing
+
 - `src/sync/markdown-normalizer.ts`
   - Uses `remark-parse` + `remark-stringify`
   - Normalizes output style to a predictable Markdown shape
@@ -97,7 +100,7 @@ This keeps VS Code `TextDocument` as the canonical source. Undo, dirty tracking,
 
 The first patch engine replaced the whole document after WebView edits. That was simple, but it created broader document changes than necessary.
 
-The current patch engine still normalizes the entire Markdown string, but it now reduces the applied `WorkspaceEdit` to the smallest changed span using prefix/suffix matching.
+The current patch engine still normalizes the entire Markdown string, but it now prefers a contiguous top-level block replacement when the document structure is stable. If that cannot be done safely, it falls back to a minimal text span using prefix/suffix matching.
 
 Accepted tradeoff:
 
@@ -107,6 +110,7 @@ Accepted tradeoff:
 Reason this was accepted:
 
 - it unblocks end-to-end editing quickly
+- it keeps many paragraph-level edits localized to the changed block span
 - it improves edit locality without yet implementing AST-aware patching
 - source-fidelity work is easier to layer later than basic sync plumbing
 

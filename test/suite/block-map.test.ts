@@ -8,6 +8,7 @@ describe('extractTopLevelBlocks', () => {
 
     expect(blocks.map((block) => block.type)).toEqual(['heading', 'paragraph', 'list']);
     expect(blocks[0]?.text).toBe('# Title');
+    expect(blocks[0]?.segmentText).toBe('# Title\n\n');
     expect(blocks[1]?.text).toBe('Paragraph text.');
     expect(blocks[2]?.text).toBe('- item');
   });

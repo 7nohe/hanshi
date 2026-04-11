@@ -21,6 +21,8 @@ export interface MarkdownBlock {
   start: number;
   end: number;
   text: string;
+  segmentEnd: number;
+  segmentText: string;
 }
 
 const parser = unified()
@@ -42,12 +44,19 @@ export function extractTopLevelBlocks(markdown: string): MarkdownBlock[] {
       return;
     }
 
+    const nextNode = children[index + 1];
+    const nextStart = nextNode?.position?.start?.offset;
+    const segmentEnd =
+      typeof nextStart === 'number' && nextStart >= end ? nextStart : markdown.length;
+
     blocks.push({
       index,
       type: node.type ?? 'unknown',
       start,
       end,
       text: markdown.slice(start, end),
+      segmentEnd,
+      segmentText: markdown.slice(start, segmentEnd),
     });
   });
 
