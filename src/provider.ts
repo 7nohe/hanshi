@@ -139,7 +139,14 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
   </head>
   <body>
     <div id="app">
-      <div id="editor"></div>
+      <div id="workspace">
+        <section id="frontmatter" data-visible="false" data-expanded="false" aria-label="Frontmatter summary">
+          <div id="frontmatter-summary"></div>
+          <button id="frontmatter-toggle" type="button">Show Raw</button>
+          <pre id="frontmatter-raw"></pre>
+        </section>
+        <div id="editor"></div>
+      </div>
       <div id="status" aria-live="polite"></div>
     </div>
     <script nonce="${nonce}" type="module" src="${scriptUri}"></script>

@@ -32,9 +32,108 @@ body {
   grid-template-rows: minmax(0, 1fr) auto;
 }
 
-#editor {
+#workspace {
   overflow: auto;
   padding: 16px 24px 24px;
+}
+
+#frontmatter,
+#editor .milkdown {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+#frontmatter {
+  display: none;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hanshi-bg) 94%, white 6%);
+}
+
+#frontmatter[data-visible='true'] {
+  display: block;
+}
+
+#frontmatter-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.hanshi-frontmatter-header {
+  display: grid;
+  gap: 4px;
+}
+
+.hanshi-frontmatter-title {
+  font-weight: 600;
+}
+
+.hanshi-frontmatter-subtitle {
+  font-size: 12px;
+  color: var(--hanshi-muted);
+}
+
+.hanshi-frontmatter-warning {
+  font-size: 12px;
+  color: var(--hanshi-error);
+}
+
+.hanshi-frontmatter-list {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.hanshi-frontmatter-list dt {
+  margin: 0;
+  color: var(--hanshi-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hanshi-frontmatter-list dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+#frontmatter-toggle {
+  margin-top: 12px;
+  border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--hanshi-fg);
+  cursor: pointer;
+  font: inherit;
+  padding: 6px 10px;
+}
+
+#frontmatter-toggle:hover {
+  background: color-mix(in srgb, var(--hanshi-hover) 70%, transparent);
+}
+
+#frontmatter-raw {
+  display: none;
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hanshi-bg) 88%, black 12%);
+  color: var(--hanshi-inline-code);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+#frontmatter[data-expanded='true'] #frontmatter-raw {
+  display: block;
+}
+
+#frontmatter[data-expanded='true'] #frontmatter-toggle::after {
+  content: '';
 }
 
 #editor .milkdown {
@@ -57,9 +156,7 @@ body {
   --crepe-color-inline-area: color-mix(in srgb, var(--hanshi-accent) 10%, var(--hanshi-bg));
   --crepe-font-default: var(--vscode-font-family);
   --crepe-font-code: var(--vscode-editor-font-family);
-  max-width: 920px;
   min-height: calc(100vh - 96px);
-  margin: 0 auto;
 }
 
 #editor .milkdown .ProseMirror {
