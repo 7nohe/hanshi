@@ -48,6 +48,9 @@ The project currently ships an MVP scaffold for a VS Code custom Markdown editor
 - `src/sync/text-diff.ts`
   - Computes the smallest changed text span between current and next content
 
+- `src/sync/block-map.ts`
+  - Extracts top-level mdast blocks with original source offsets
+
 - `src/sync/markdown-normalizer.ts`
   - Uses `remark-parse` + `remark-stringify`
   - Normalizes output style to a predictable Markdown shape
