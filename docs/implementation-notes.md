@@ -8,9 +8,7 @@ The source of truth for planned scope is still [implementation-plan.md](../imple
 
 ## Product Direction
 
-Hanshi is no longer treated as a generic WYSIWYG Markdown editor project.
-
-After comparing the existing extension `vscode-markdown-live-editor`, the intended direction is now:
+Hanshi is not treated as a generic WYSIWYG Markdown editor project. The intended direction is:
 
 - not a feature race against existing Milkdown editors
 - not a Typora clone for VS Code
@@ -22,35 +20,6 @@ This means Hanshi should prefer:
 - minimal and targeted `WorkspaceEdit` ranges over full reserialization
 - stable coexistence with formatters, lint rules, and hand-edited Markdown
 - feature work only when it does not compromise source preservation
-
-## Comparison With Existing Extension
-
-The existing repository `vscode-markdown-live-editor` is ahead in editor features:
-
-- outline panel
-- in-editor find
-- heading folding
-- selection toolbar and link tooltip
-- KaTeX
-- Mermaid editing UI
-- slash commands
-- emoji shortcode
-- custom CSS
-- export HTML
-- VS Code Web support
-
-Hanshi is currently ahead in persistence-oriented areas:
-
-- version-aware sync instead of short-lived echo suppression by content equality
-- targeted replacement ranges instead of unconditional full-document replacement
-- block-aware replacement for contiguous top-level changes
-- explicit IME composition deferral
-- ongoing work toward stricter source fidelity
-
-The practical conclusion is:
-
-- existing extension for general-purpose editor richness
-- Hanshi for source-faithful specification and design document workflows
 
 ## Current Status
 

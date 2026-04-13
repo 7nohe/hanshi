@@ -23,6 +23,12 @@ The project currently includes:
 
 The project is still in active development and should be treated as pre-release software.
 
+## Documentation
+
+- [Usage](./docs/usage.md) — how to open files with Hanshi, edit, insert images, copy selection references.
+- [AI Inline Completions](./docs/ai-completions.md) — Copilot-backed completions, consent, and settings.
+- [Implementation Notes](./docs/implementation-notes.md) — design decisions and tradeoffs.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, development workflow, and contribution guidelines.
