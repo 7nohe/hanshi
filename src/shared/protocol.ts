@@ -56,6 +56,11 @@ export interface CompletionClearedMessage {
   version: number;
 }
 
+export interface GetSelectionMessage {
+  type: 'getSelection';
+  requestId: string;
+}
+
 export type HostToWebviewMessage =
   | InitMessage
   | ExternalUpdateMessage
@@ -65,7 +70,8 @@ export type HostToWebviewMessage =
   | SaveImageResultMessage
   | ResolveImageSrcResultMessage
   | CompletionResultMessage
-  | CompletionClearedMessage;
+  | CompletionClearedMessage
+  | GetSelectionMessage;
 
 export interface EditMessage extends MarkdownSnapshot {
   type: 'edit';
@@ -112,18 +118,46 @@ export interface CancelCompletionMessage extends Pick<MarkdownSnapshot, 'version
   requestId?: string;
 }
 
+export interface SelectionResponseMessage {
+  type: 'selectionResponse';
+  requestId: string;
+  selectedText: string;
+  contextBefore: string;
+  contextAfter: string;
+}
+
+export interface CopySelectionContextMessage {
+  type: 'copySelectionContext';
+}
+
 export type WebviewToHostMessage =
   | EditMessage
   | ReadyMessage
   | SaveImageRequestMessage
   | ResolveImageSrcRequestMessage
   | RequestCompletionMessage
-  | CancelCompletionMessage;
+  | CancelCompletionMessage
+  | SelectionResponseMessage
+  | CopySelectionContextMessage;
+
+const HOST_TO_WEBVIEW_TYPES = new Set<string>([
+  'init', 'externalUpdate', 'setReadonly', 'hostError', 'hostNotice',
+  'saveImageResult', 'resolveImageSrcResult', 'completionResult', 'completionCleared', 'getSelection',
+]);
+
+const WEBVIEW_TO_HOST_TYPES = new Set<string>([
+  'edit', 'ready', 'saveImageRequest', 'resolveImageSrcRequest',
+  'requestCompletion', 'cancelCompletion', 'selectionResponse', 'copySelectionContext',
+]);
 
 export function isHostToWebviewMessage(value: unknown): value is HostToWebviewMessage {
-  return Boolean(value) && typeof value === 'object' && 'type' in (value as Record<string, unknown>);
+  if (!value || typeof value !== 'object') return false;
+  const type = (value as Record<string, unknown>).type;
+  return typeof type === 'string' && HOST_TO_WEBVIEW_TYPES.has(type);
 }
 
 export function isWebviewToHostMessage(value: unknown): value is WebviewToHostMessage {
-  return Boolean(value) && typeof value === 'object' && 'type' in (value as Record<string, unknown>);
+  if (!value || typeof value !== 'object') return false;
+  const type = (value as Record<string, unknown>).type;
+  return typeof type === 'string' && WEBVIEW_TO_HOST_TYPES.has(type);
 }

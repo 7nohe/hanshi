@@ -30,6 +30,32 @@
       {
         "command": "hanshi.open",
         "title": "Open With Hanshi"
+      },
+      {
+        "command": "hanshi.copySelectionContext",
+        "title": "Hanshi: Copy Selection Reference"
+      },
+      {
+        "command": "hanshi.sendSelectionToChat",
+        "title": "Hanshi: Send Selection to Chat"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "hanshi_getSelection",
+        "displayName": "Hanshi: Get Selection",
+        "modelDescription": "Get the currently selected text and its file location from the active Hanshi Markdown editor.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hanshi-selection",
+        "parametersSchema": {}
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "hanshi.copySelectionContext",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "when": "activeCustomEditorId == 'hanshi.markdownEditor'"
       }
     ],
     "configuration": {
@@ -46,7 +72,7 @@
   "scripts": {
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "check": "bun run typecheck",
     "lint": "biome lint .",
     "test": "vitest run",

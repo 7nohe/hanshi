@@ -1,5 +1,5 @@
 import { Crepe, CrepeFeature } from '@milkdown/crepe';
-import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
+import { editorViewCtx, parserCtx, serializerCtx } from '@milkdown/kit/core';
 import { Selection, TextSelection } from '@milkdown/kit/prose/state';
 import { insert, replaceAll } from '@milkdown/utils';
 import '@milkdown/crepe/theme/common/style.css';
@@ -7,11 +7,15 @@ import '@milkdown/crepe/theme/classic.css';
 import './styles/editor.css';
 import type { HostToWebviewMessage } from '../shared/protocol';
 import { WebviewBridge } from './bridge';
+import { EditorView as CMEditorView } from '@codemirror/view';
 import { CompletionController } from './completion';
 import { mergeFrontmatter, splitMarkdownFrontmatter, type FrontmatterState } from './frontmatter';
 import { createImageMarkdown } from './markdown';
 import { renderMermaidPreview } from './plugins/mermaid-block';
 import { createSyncPlugin, type SyncPluginHandle } from './plugins/sync-plugin';
+
+const COPY_REF_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
 const bridge = new WebviewBridge();
 const workspaceRoot = getRequiredElement<HTMLElement>('workspace');
@@ -31,6 +35,7 @@ let pendingExternalUpdate: string | undefined;
 let currentFrontmatter: FrontmatterState | undefined;
 let hasPendingLocalChanges = false;
 let requestSequence = 0;
+let lastNonEmptySelection: { from: number; to: number } | undefined;
 
 interface SelectionSnapshot {
   anchor: number;
@@ -105,12 +110,57 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
     case 'completionCleared':
       completionController?.clearFromHost(message);
       return;
+    case 'getSelection':
+      bridge.postMessage(buildSelectionResponse(message.requestId));
+      return;
   }
+}
+
+function buildSelectionResponse(
+  requestId: string,
+): Extract<import('../shared/protocol').WebviewToHostMessage, { type: 'selectionResponse' }> {
+  const empty = { type: 'selectionResponse' as const, requestId, selectedText: '', contextBefore: '', contextAfter: '' };
+
+  if (!editor) {
+    return empty;
+  }
+
+  return editor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    let { from, to } = view.state.selection;
+
+    if (from === to) {
+      if (lastNonEmptySelection) {
+        from = lastNonEmptySelection.from;
+        to = lastNonEmptySelection.to;
+      } else {
+        return empty;
+      }
+    }
+
+    const serializer = ctx.get(serializerCtx);
+    const schema = view.state.schema;
+
+    const selectionSlice = view.state.doc.slice(from, to);
+    const selectionDoc = schema.topNodeType.create(null, selectionSlice.content);
+    const selectedText = serializer(selectionDoc).trim();
+
+    const beforeSlice = view.state.doc.slice(Math.max(0, from - 200), from);
+    const beforeDoc = schema.topNodeType.create(null, beforeSlice.content);
+    const contextBefore = serializer(beforeDoc).trim().slice(-100);
+
+    const afterSlice = view.state.doc.slice(to, Math.min(view.state.doc.content.size, to + 200));
+    const afterDoc = schema.topNodeType.create(null, afterSlice.content);
+    const contextAfter = serializer(afterDoc).trim().slice(0, 100);
+
+    return { type: 'selectionResponse', requestId, selectedText, contextBefore, contextAfter };
+  });
 }
 
 async function mountEditor(markdown: string): Promise<void> {
   const { frontmatter, body } = splitMarkdownFrontmatter(markdown);
   currentFrontmatter = frontmatter;
+  lastNonEmptySelection = undefined;
 
   if (editor) {
     syncPlugin?.dispose();
@@ -137,11 +187,36 @@ async function mountEditor(markdown: string): Promise<void> {
           return resolveImageSource(src);
         },
       },
+      [CrepeFeature.Toolbar]: {
+        buildToolbar: (builder) => {
+          builder.addGroup('copy-ref', 'Copy Reference').addItem('copy-selection-ref', {
+            icon: COPY_REF_ICON,
+            active: () => false,
+            onRun: () => {
+              bridge.postMessage({ type: 'copySelectionContext' });
+            },
+          });
+        },
+      },
     },
   });
 
   await editor.create();
   editor.setReadonly(!currentEditable);
+
+  // Track selection changes to preserve last non-empty selection for toolbar actions
+  editor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const originalDispatch = view.dispatch.bind(view);
+    view.dispatch = (...args) => {
+      originalDispatch(...args);
+      const { from, to } = view.state.selection;
+      if (from !== to) {
+        lastNonEmptySelection = { from, to };
+      }
+    };
+  });
+
   renderFrontmatter(currentFrontmatter);
   completionController = new CompletionController({
     root: editorRoot,
@@ -207,6 +282,7 @@ async function replaceEditorContent(markdown: string): Promise<void> {
   pendingExternalUpdate = undefined;
   const { frontmatter, body } = splitMarkdownFrontmatter(markdown);
   currentFrontmatter = frontmatter;
+  lastNonEmptySelection = undefined;
 
   if (!editor) {
     await mountEditor(markdown);
@@ -418,11 +494,37 @@ function insertTextAtSelection(text: string): void {
     return;
   }
 
+  if (insertIntoCodeMirror(text)) {
+    return;
+  }
+
   if (applyBlockMarkdownCompletion(text)) {
     return;
   }
 
   editor?.editor.action(insert(text, true));
+}
+
+function insertIntoCodeMirror(text: string): boolean {
+  const selection = window.getSelection();
+  const anchor = selection?.anchorNode;
+  const element = anchor instanceof HTMLElement ? anchor : anchor?.parentElement;
+  const cmEditor = element?.closest('.cm-editor');
+
+  if (!(cmEditor instanceof HTMLElement)) {
+    return false;
+  }
+
+  const view = CMEditorView.findFromDOM(cmEditor);
+
+  if (!view) {
+    return false;
+  }
+
+  const { from, to } = view.state.selection.main;
+  const end = from + text.length;
+  view.dispatch({ changes: { from, to, insert: text }, selection: { anchor: end } });
+  return true;
 }
 
 function applyBlockMarkdownCompletion(markdown: string): boolean {

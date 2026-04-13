@@ -7,14 +7,100 @@ import type {
   RequestCompletionMessage,
   ResolveImageSrcRequestMessage,
   SaveImageRequestMessage,
+  SelectionResponseMessage,
   WebviewToHostMessage,
 } from './shared/protocol';
+
+export interface SelectionRange {
+  startLine: number;
+  startColumn: number;
+  endLine: number;
+  endColumn: number;
+}
+
+export interface SelectionResult extends SelectionRange {
+  text: string;
+  filePath: string;
+}
+
+export function formatSelectionRef(sel: SelectionResult): string {
+  if (sel.startLine === sel.endLine) {
+    return `${sel.filePath}:${sel.startLine}:${sel.startColumn}-${sel.endColumn}`;
+  }
+  return `${sel.filePath}:${sel.startLine}:${sel.startColumn}-${sel.endLine}:${sel.endColumn}`;
+}
+
+export async function copySelectionRefToClipboard(): Promise<void> {
+  const sel = await HanshiEditorProvider.getSelection();
+
+  if (!sel) {
+    void vscode.window.showInformationMessage('No text selected in Hanshi editor.');
+    return;
+  }
+
+  const ref = formatSelectionRef(sel);
+  await vscode.env.clipboard.writeText(ref);
+  void vscode.window.showInformationMessage(`Copied: ${ref}`);
+}
 
 export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'hanshi.markdownEditor';
   private readonly relatedFilesCache = new Map<string, Array<{ path: string; excerpt: string }>>();
 
+  private static activeWebview: vscode.Webview | undefined;
+  private static activeDocument: vscode.TextDocument | undefined;
+  private static selectionCallbacks = new Map<string, (response: SelectionResponseMessage) => void>();
+  private static requestSequence = 0;
+
   public constructor(private readonly context: vscode.ExtensionContext) {}
+
+  public static async getSelection(): Promise<SelectionResult | undefined> {
+    if (!this.activeWebview || !this.activeDocument) {
+      return undefined;
+    }
+
+    const requestId = `sel-${++this.requestSequence}`;
+    const webview = this.activeWebview;
+    const document = this.activeDocument;
+
+    const response = await new Promise<SelectionResponseMessage | undefined>((resolve) => {
+      const timer = setTimeout(() => {
+        this.selectionCallbacks.delete(requestId);
+        resolve(undefined);
+      }, 3000);
+      this.selectionCallbacks.set(requestId, (msg) => {
+        clearTimeout(timer);
+        resolve(msg);
+      });
+      void webview.postMessage({ type: 'getSelection', requestId } satisfies HostToWebviewMessage);
+    });
+
+    if (!response || !response.selectedText) {
+      return undefined;
+    }
+
+    const offsets = findSelectionOffsets(
+      document.getText(),
+      response.selectedText,
+      response.contextBefore,
+    );
+
+    if (!offsets) {
+      return undefined;
+    }
+
+    const startPos = document.positionAt(offsets.start);
+    const endPos = document.positionAt(offsets.end);
+
+    return {
+      text: response.selectedText,
+      filePath: document.uri.fsPath,
+      startLine: startPos.line + 1,
+      startColumn: startPos.character + 1,
+      endLine: endPos.line + 1,
+      endColumn: endPos.character + 1,
+    };
+  }
 
   public async resolveCustomTextEditor(
     document: vscode.TextDocument,
@@ -96,6 +182,17 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
           case 'resolveImageSrcRequest':
             await this.handleResolveImageSrc(document, message, webview);
             return;
+          case 'copySelectionContext':
+            await copySelectionRefToClipboard();
+            return;
+          case 'selectionResponse': {
+            const callback = HanshiEditorProvider.selectionCallbacks.get(message.requestId);
+            if (callback) {
+              HanshiEditorProvider.selectionCallbacks.delete(message.requestId);
+              callback(message);
+            }
+            return;
+          }
         }
       } catch (error) {
         const resolved = error instanceof Error ? error : new Error(String(error));
@@ -108,13 +205,24 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
     });
 
     webviewPanel.onDidChangeViewState(() => {
+      if (webviewPanel.active) {
+        HanshiEditorProvider.activeWebview = webview;
+        HanshiEditorProvider.activeDocument = document;
+      }
       void webview.postMessage({
         type: 'setReadonly',
         editable: !webviewPanel.active ? false : !document.isClosed,
       } satisfies HostToWebviewMessage);
     });
 
+    HanshiEditorProvider.activeWebview = webview;
+    HanshiEditorProvider.activeDocument = document;
+
     webviewPanel.onDidDispose(() => {
+      if (HanshiEditorProvider.activeWebview === webview) {
+        HanshiEditorProvider.activeWebview = undefined;
+        HanshiEditorProvider.activeDocument = undefined;
+      }
       changeSubscription.dispose();
       completions.dispose();
       sync.dispose();
@@ -171,22 +279,24 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
     name: string,
     dataUrl: string,
   ): Promise<{ alt: string; path: string }> {
-    const match = dataUrl.match(/^data:(.+);base64,(.+)$/);
+    const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/\r\n]+=*)$/);
 
     if (!match) {
-      throw new Error('Image payload is not a valid data URL.');
+      throw new Error('Image payload is not a valid image data URL.');
     }
 
     const [, mime, base64] = match;
     const bytes = Buffer.from(base64, 'base64');
-    const extension = mime.split('/')[1] ?? 'png';
+    const rawExt = (mime.split('/')[1] ?? 'png').replace(/[^a-zA-Z0-9]/g, '');
+    const extension = rawExt || 'png';
     const parsed = path.parse(name);
     const safeBaseName = parsed.name.replace(/[^a-zA-Z0-9-_]/g, '-').replace(/-+/g, '-');
     const documentDirectory = path.dirname(document.uri.fsPath);
     const assetDirectory = vscode.Uri.joinPath(vscode.Uri.file(documentDirectory), 'assets');
     await vscode.workspace.fs.createDirectory(assetDirectory);
 
-    const fileName = `${safeBaseName || 'image'}-${Date.now()}.${extension}`;
+    const suffix = Array.from({ length: 6 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
+    const fileName = `${safeBaseName || 'image'}-${Date.now()}-${suffix}.${extension}`;
     const imageUri = vscode.Uri.joinPath(assetDirectory, fileName);
     await vscode.workspace.fs.writeFile(imageUri, bytes);
 
@@ -206,9 +316,17 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
       return src;
     }
 
-    const resolvedPath = path.isAbsolute(src)
-      ? src
-      : path.resolve(path.dirname(document.uri.fsPath), src);
+    if (path.isAbsolute(src)) {
+      throw new Error('Absolute image paths are not allowed.');
+    }
+
+    const documentDirectory = path.dirname(document.uri.fsPath);
+    const resolvedPath = path.resolve(documentDirectory, src);
+
+    if (!resolvedPath.startsWith(documentDirectory + path.sep) && resolvedPath !== documentDirectory) {
+      throw new Error('Image path escapes the document directory.');
+    }
+
     const resolvedUri = webview.asWebviewUri(vscode.Uri.file(resolvedPath));
 
     return resolvedUri.toString();
@@ -352,7 +470,112 @@ function createNonce(): string {
   return Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
 }
 
-function* extractMarkdownLinks(markdown: string): Generator<string> {
+function stripMarkdownInline(line: string): string {
+  return line
+    .replace(/^[\s>]*(?:[-*+]|\d+\.)\s+/, '')
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/_(.+?)_/g, '$1')
+    .replace(/~~(.+?)~~/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .trim();
+}
+
+export function findSelectionOffsets(
+  sourceText: string,
+  selectedPlainText: string,
+  contextBefore: string,
+): { start: number; end: number } | undefined {
+  const matchIndex = sourceText.indexOf(selectedPlainText);
+
+  if (matchIndex !== -1) {
+    return { start: matchIndex, end: matchIndex + selectedPlainText.length };
+  }
+
+  const selectedLines = selectedPlainText
+    .split('\n')
+    .map((l) => stripMarkdownInline(l))
+    .filter((l) => l && l !== '<br />' && l !== '<br/>');
+
+  if (selectedLines.length === 0) {
+    return undefined;
+  }
+
+  const sourceLines = sourceText.split('\n');
+  const strippedSourceLines = sourceLines.map(stripMarkdownInline);
+  const firstTarget = selectedLines[0];
+  const lastTarget = selectedLines[selectedLines.length - 1];
+
+  const contextLastLine = contextBefore
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .pop() ?? '';
+
+  let searchFrom = 0;
+
+  if (contextLastLine) {
+    for (let i = 0; i < strippedSourceLines.length; i++) {
+      if (strippedSourceLines[i].includes(contextLastLine)) {
+        searchFrom = i + 1;
+      }
+    }
+  }
+
+  const findFirst = (from: number): number => {
+    for (let i = from; i < strippedSourceLines.length; i++) {
+      if (strippedSourceLines[i].includes(firstTarget)) {
+        return i;
+      }
+    }
+    return -1;
+  };
+
+  const primary = findFirst(searchFrom);
+  const startLineIdx = primary !== -1 ? primary : findFirst(0);
+
+  if (startLineIdx === -1) {
+    return undefined;
+  }
+
+  let endLineIdx = startLineIdx;
+
+  if (selectedLines.length > 1) {
+    for (let i = startLineIdx; i < strippedSourceLines.length; i++) {
+      if (strippedSourceLines[i].includes(lastTarget)) {
+        endLineIdx = i;
+        if (i > startLineIdx) {
+          break;
+        }
+      }
+    }
+  }
+
+  const startInSourceLine = sourceLines[startLineIdx].indexOf(firstTarget);
+  const endInSourceLine = sourceLines[endLineIdx].indexOf(lastTarget);
+
+  if (startInSourceLine === -1 || endInSourceLine === -1) {
+    return undefined;
+  }
+
+  const lineStartOffset = (lineIdx: number): number => {
+    let offset = 0;
+    for (let i = 0; i < lineIdx; i++) {
+      offset += sourceLines[i].length + 1;
+    }
+    return offset;
+  };
+
+  return {
+    start: lineStartOffset(startLineIdx) + startInSourceLine,
+    end: lineStartOffset(endLineIdx) + endInSourceLine + lastTarget.length,
+  };
+}
+
+export function* extractMarkdownLinks(markdown: string): Generator<string> {
   const matches = markdown.matchAll(/\[[^\]]*]\(([^)\s#?]+\.md)\)/g);
 
   for (const match of matches) {
