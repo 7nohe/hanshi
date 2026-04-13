@@ -28,8 +28,19 @@ export class InlineCompletionService {
   private lastNotice: string | undefined;
   private requestSource: vscode.CancellationTokenSource | undefined;
   private selectedModelPromise: Promise<vscode.LanguageModelChat | undefined> | undefined;
+  private readonly subscriptions: vscode.Disposable[] = [];
 
-  public constructor(private readonly options: InlineCompletionServiceOptions) {}
+  public constructor(private readonly options: InlineCompletionServiceOptions) {
+    const invalidate = () => {
+      this.selectedModelPromise = undefined;
+      this.lastNotice = undefined;
+    };
+
+    this.subscriptions.push(
+      this.options.languageModelAccessInformation.onDidChange(invalidate),
+      vscode.lm.onDidChangeChatModels(invalidate),
+    );
+  }
 
   public async handleRequest(message: RequestCompletionMessage): Promise<void> {
     this.latestRequestId = message.requestId;
@@ -80,6 +91,10 @@ export class InlineCompletionService {
         return;
       }
 
+      if (shouldInvalidateModelCache(error)) {
+        this.selectedModelPromise = undefined;
+      }
+
       const notice = toCompletionNotice(error);
       this.pushNotice(notice);
       await this.postCleared(message.requestId, message.version);
@@ -105,6 +120,10 @@ export class InlineCompletionService {
   public dispose(): void {
     this.cancelOngoingRequest();
     this.selectedModelPromise = undefined;
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
+    this.subscriptions.length = 0;
   }
 
   private async selectModel(): Promise<vscode.LanguageModelChat | undefined> {
@@ -116,6 +135,15 @@ export class InlineCompletionService {
 
     if (!model) {
       this.selectedModelPromise = undefined;
+      return undefined;
+    }
+
+    // Re-check access on every request: the user may have revoked consent
+    // after the model was first resolved.
+    if (this.options.languageModelAccessInformation.canSendRequest(model) === false) {
+      this.selectedModelPromise = undefined;
+      this.pushNotice(COMPLETION_UNAVAILABLE_NOTICE);
+      return undefined;
     }
 
     return model;
@@ -210,6 +238,17 @@ async function collectText(
   }
 
   return text;
+}
+
+function shouldInvalidateModelCache(error: unknown): boolean {
+  if (!(error instanceof vscode.LanguageModelError)) {
+    return false;
+  }
+
+  return (
+    error.code === vscode.LanguageModelError.NoPermissions().code ||
+    error.code === vscode.LanguageModelError.NotFound().code
+  );
 }
 
 function toCompletionNotice(error: unknown): string {
