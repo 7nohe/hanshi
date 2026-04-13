@@ -20,49 +20,45 @@ export function computeBlockReplaceRange(current: string, next: string): Replace
   const currentBlocks = extractTopLevelBlocks(current);
   const nextBlocks = extractTopLevelBlocks(next);
 
-  if (!currentBlocks.length || currentBlocks.length !== nextBlocks.length) {
+  if (!currentBlocks.length || !nextBlocks.length) {
     return undefined;
   }
 
-  const changedIndices: number[] = [];
-
-  for (let index = 0; index < currentBlocks.length; index += 1) {
-    const currentBlock = currentBlocks[index];
-    const nextBlock = nextBlocks[index];
-
-    if (!currentBlock || !nextBlock) {
-      return undefined;
-    }
-
-    if (currentBlock.type !== nextBlock.type || currentBlock.segmentText !== nextBlock.segmentText) {
-      changedIndices.push(index);
-    }
+  // Find common prefix blocks
+  const minLen = Math.min(currentBlocks.length, nextBlocks.length);
+  let prefixCount = 0;
+  while (prefixCount < minLen) {
+    const cb = currentBlocks[prefixCount];
+    const nb = nextBlocks[prefixCount];
+    if (!cb || !nb || cb.type !== nb.type || cb.segmentText !== nb.segmentText) break;
+    prefixCount++;
   }
 
-  if (!changedIndices.length) {
-    return undefined;
+  // Find common suffix blocks (not overlapping with prefix)
+  let suffixCount = 0;
+  while (suffixCount < minLen - prefixCount) {
+    const ci = currentBlocks.length - 1 - suffixCount;
+    const ni = nextBlocks.length - 1 - suffixCount;
+    const cb = currentBlocks[ci];
+    const nb = nextBlocks[ni];
+    if (!cb || !nb || cb.type !== nb.type || cb.segmentText !== nb.segmentText) break;
+    suffixCount++;
   }
 
-  const first = changedIndices[0];
-  const last = changedIndices[changedIndices.length - 1];
-  if (first === undefined || last === undefined) {
-    return undefined;
+  if (prefixCount + suffixCount >= currentBlocks.length && prefixCount + suffixCount >= nextBlocks.length) {
+    return undefined; // no change
   }
 
-  for (let index = first; index <= last; index += 1) {
-    if (!changedIndices.includes(index)) {
-      return undefined;
-    }
-  }
+  const currentStart = prefixCount < currentBlocks.length
+    ? currentBlocks[prefixCount]!.start
+    : current.length;
+  const currentEnd = suffixCount > 0
+    ? currentBlocks[currentBlocks.length - suffixCount]!.start
+    : current.length;
 
-  const currentStart = currentBlocks[first]?.start;
-  const currentEnd = currentBlocks[last]?.segmentEnd;
-
-  if (typeof currentStart !== 'number' || typeof currentEnd !== 'number') {
-    return undefined;
-  }
-
-  const nextText = nextBlocks.slice(first, last + 1).map((block) => block.segmentText).join('');
+  const nextFirst = prefixCount;
+  const nextLast = nextBlocks.length - suffixCount;
+  const nextText = nextBlocks.slice(nextFirst, nextLast).map((b) => b.segmentText).join('');
 
   return {
     start: currentStart,

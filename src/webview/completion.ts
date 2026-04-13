@@ -22,7 +22,7 @@ interface ActiveCompletion {
   displayText: string;
 }
 
-const COMPLETION_DEBOUNCE_MS = 60;
+const COMPLETION_DEBOUNCE_MS = 250;
 
 export class CompletionController {
   private readonly overlay = document.createElement('div');
@@ -203,6 +203,10 @@ export class CompletionController {
   };
 
   private renderActiveCompletion(): void {
+    if (!this.activeCompletion) {
+      return;
+    }
+
     const selection = window.getSelection();
 
     if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) {

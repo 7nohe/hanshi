@@ -18,10 +18,10 @@
     ]
   },
   "include": [
-    "src/**/*.ts",
-    "test/**/*.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
-    "src/webview/**/*"
+    "src/webview/**/*",
+    "test/**/*"
   ]
 }

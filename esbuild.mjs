@@ -27,7 +27,7 @@ const webviewConfig = {
   chunkNames: 'chunks/[name]-[hash]',
   assetNames: 'assets/[name]-[hash]',
   sourcemap: true,
-  minify: false,
+  minify: !watch,
   splitting: true,
   logLevel: 'info',
   loader: {

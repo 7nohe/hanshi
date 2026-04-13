@@ -70,6 +70,7 @@ export function sanitizeCompletion(rawText: string, context: CompletionContext):
 }
 
 function clipCompletion(text: string, context: CompletionContext): string {
+  const inCodeBlock = context.currentBlockKind === 'code-block';
   const paragraphs = text
     .split(/\n\s*\n/)
     .map((segment) => segment.trimEnd())
@@ -81,7 +82,7 @@ function clipCompletion(text: string, context: CompletionContext): string {
   let totalLength = 0;
 
   for (const line of lines) {
-    if (keptLines.length > 0 && isLikelyNewMarkdownBlock(line)) {
+    if (!inCodeBlock && keptLines.length > 0 && isLikelyNewMarkdownBlock(line)) {
       break;
     }
 
@@ -103,6 +104,10 @@ function isLikelyNewMarkdownBlock(line: string): boolean {
 }
 
 function shouldAllowMultilineCompletion(context: CompletionContext): boolean {
+  if (context.currentBlockKind === 'code-block') {
+    return true;
+  }
+
   const prefix = context.currentLinePrefix.trim();
   const suffix = context.currentLineSuffix.trim();
 

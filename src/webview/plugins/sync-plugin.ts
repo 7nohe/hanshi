@@ -14,21 +14,19 @@ export interface SyncPluginHandle {
   isComposing(): boolean;
 }
 
+const SYNC_DEBOUNCE_MS = 150;
+
 export function createSyncPlugin(editor: Crepe, options: SyncPluginOptions): SyncPluginHandle {
   let composing = false;
   let pendingTimer: number | undefined;
 
-  const flush = () => {
-    if (composing) {
-      return;
-    }
-
-    options.onMarkdownChange(editor.getMarkdown(), options.getVersion());
-  };
-
   const schedule = () => {
     window.clearTimeout(pendingTimer);
-    pendingTimer = window.setTimeout(flush, 150);
+    pendingTimer = window.setTimeout(() => {
+      if (!composing) {
+        options.onMarkdownChange(editor.getMarkdown(), options.getVersion());
+      }
+    }, SYNC_DEBOUNCE_MS);
   };
 
   const onCompositionStart = () => {
@@ -47,16 +45,13 @@ export function createSyncPlugin(editor: Crepe, options: SyncPluginOptions): Syn
   options.root.addEventListener('compositionend', onCompositionEnd);
 
   editor.on((listener) => {
-    listener.markdownUpdated((_ctx, markdown) => {
+    listener.markdownUpdated((_ctx, _markdown) => {
       if (composing) {
         return;
       }
 
       options.onUserInput?.();
-      window.clearTimeout(pendingTimer);
-      pendingTimer = window.setTimeout(() => {
-        options.onMarkdownChange(markdown, options.getVersion());
-      }, 150);
+      schedule();
     });
   });
 
