@@ -49,6 +49,17 @@ export function computeBlockReplaceRange(current: string, next: string): Replace
     return undefined; // no change
   }
 
+  // Detect non-contiguous changes: if any block inside the middle span is unchanged
+  // (i.e. shared between current and next middles), fall back to text diff.
+  const currentMiddle = currentBlocks.slice(prefixCount, currentBlocks.length - suffixCount);
+  const nextMiddle = nextBlocks.slice(prefixCount, nextBlocks.length - suffixCount);
+  const nextMiddleTexts = new Set(nextMiddle.map((b) => b.segmentText));
+  for (const cb of currentMiddle) {
+    if (nextMiddleTexts.has(cb.segmentText)) {
+      return undefined;
+    }
+  }
+
   const currentStart = prefixCount < currentBlocks.length
     ? currentBlocks[prefixCount]!.start
     : current.length;
