@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/7nohe/hanshi/main/assets/logo.png" alt="Hanshi" width="200" />
+</p>
+
 # Hanshi
 
 Hanshi is a VS Code custom Markdown editor aimed at docs-as-code workflows.
