@@ -1,6 +1,8 @@
 node_modules
 .npm-cache
 dist
+out
+dist-types
 .agents/plans
 .vscode-test
 .serena
