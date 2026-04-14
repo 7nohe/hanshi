@@ -9,12 +9,20 @@
     "type": "git",
     "url": "https://github.com/7nohe/hanshi.git"
   },
+  "icon": "assets/logo.png",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
     "Other",
     "Programming Languages"
+  ],
+  "keywords": [
+    "markdown",
+    "wysiwyg",
+    "editor",
+    "milkdown",
+    "mermaid"
   ],
   "main": "./dist/extension.js",
   "contributes": {
