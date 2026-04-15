@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 
-const EXTENSION_ID = 'local.hanshi';
+const EXTENSION_ID = 'hanshi.hanshi';
 const VIEW_TYPE = 'hanshi.markdownEditor';
 
 async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 5000): Promise<void> {
