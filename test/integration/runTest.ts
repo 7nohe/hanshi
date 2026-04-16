@@ -12,6 +12,7 @@ async function main(): Promise<void> {
       extensionDevelopmentPath,
       extensionTestsPath,
       launchArgs: [workspacePath, '--disable-extensions'],
+      timeout: 60_000,
     });
   } catch (err) {
     console.error('Failed to run integration tests:', err);

@@ -46,5 +46,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Cache VS Code binary
+        uses: actions/cache@v4
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-stable
+
       - name: Integration tests
         run: xvfb-run -a bun run test:integration
