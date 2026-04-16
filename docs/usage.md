@@ -53,6 +53,14 @@ Hanshi can suggest short continuations as you type, using GitHub Copilot through
 
 The `hanshi.aiCompletions.enabled` setting (default `true`) toggles the feature without affecting Copilot access for other extensions.
 
+## Compatibility with Cursor and Other VS Code Forks
+
+Hanshi works in Cursor and other VS Code forks. WYSIWYG editing, document sync, Mermaid preview, and image insertion all function normally.
+
+AI features (inline completions and the `hanshi-selection` language model tool) depend on the `vscode.lm` API, which is part of the GitHub Copilot integration in VS Code. Forks that do not implement this API — including Cursor, which uses its own AI backend — will silently skip these features. The rest of the extension is unaffected.
+
+To install Hanshi in Cursor, use the Open VSX Registry or install the `.vsix` file manually (`Extensions: Install from VSIX…` in the Command Palette).
+
 ## Switching Back to the Plain Text Editor
 
 Right click a `.md` file → **Open With…** → **Text Editor**, or use **Reopen Editor With…** from the Command Palette. If you previously set Hanshi as the default editor, **Configure Default Editor for `*.md`…** lets you switch the default back.
