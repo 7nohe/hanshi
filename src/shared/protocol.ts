@@ -6,15 +6,19 @@ export interface MarkdownSnapshot {
 export interface InitMessage extends MarkdownSnapshot {
   type: 'init';
   editable: boolean;
+  completionsEnabled: boolean;
 }
+
+export type ExternalUpdateReason = 'stale' | 'undo' | 'redo' | 'revert' | 'save-normalize' | 'edit';
 
 export interface ExternalUpdateMessage extends MarkdownSnapshot {
   type: 'externalUpdate';
+  reason?: ExternalUpdateReason;
 }
 
-export interface SetReadonlyMessage {
-  type: 'setReadonly';
-  editable: boolean;
+export interface SetCompletionsEnabledMessage {
+  type: 'setCompletionsEnabled';
+  enabled: boolean;
 }
 
 export interface HostErrorMessage {
@@ -64,7 +68,7 @@ export interface GetSelectionMessage {
 export type HostToWebviewMessage =
   | InitMessage
   | ExternalUpdateMessage
-  | SetReadonlyMessage
+  | SetCompletionsEnabledMessage
   | HostErrorMessage
   | HostNoticeMessage
   | SaveImageResultMessage
@@ -130,6 +134,11 @@ export interface CopySelectionContextMessage {
   type: 'copySelectionContext';
 }
 
+export interface RequestHistoryMessage {
+  type: 'requestHistory';
+  direction: 'undo' | 'redo';
+}
+
 export type WebviewToHostMessage =
   | EditMessage
   | ReadyMessage
@@ -138,16 +147,18 @@ export type WebviewToHostMessage =
   | RequestCompletionMessage
   | CancelCompletionMessage
   | SelectionResponseMessage
-  | CopySelectionContextMessage;
+  | CopySelectionContextMessage
+  | RequestHistoryMessage;
 
 const HOST_TO_WEBVIEW_TYPES = new Set<string>([
-  'init', 'externalUpdate', 'setReadonly', 'hostError', 'hostNotice',
+  'init', 'externalUpdate', 'setCompletionsEnabled', 'hostError', 'hostNotice',
   'saveImageResult', 'resolveImageSrcResult', 'completionResult', 'completionCleared', 'getSelection',
 ]);
 
 const WEBVIEW_TO_HOST_TYPES = new Set<string>([
   'edit', 'ready', 'saveImageRequest', 'resolveImageSrcRequest',
   'requestCompletion', 'cancelCompletion', 'selectionResponse', 'copySelectionContext',
+  'requestHistory',
 ]);
 
 export function isHostToWebviewMessage(value: unknown): value is HostToWebviewMessage {

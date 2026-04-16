@@ -12,18 +12,23 @@ export interface SyncPluginOptions {
 export interface SyncPluginHandle {
   dispose(): void;
   isComposing(): boolean;
+  isSuppressed(): boolean;
+  setSuppressed(value: boolean): void;
+  ignoreNextChange(): void;
 }
 
 const SYNC_DEBOUNCE_MS = 150;
 
 export function createSyncPlugin(editor: Crepe, options: SyncPluginOptions): SyncPluginHandle {
   let composing = false;
+  let suppressed = false;
   let pendingTimer: number | undefined;
+  let ignoredChanges = 0;
 
   const schedule = () => {
     window.clearTimeout(pendingTimer);
     pendingTimer = window.setTimeout(() => {
-      if (!composing) {
+      if (!composing && !suppressed) {
         options.onMarkdownChange(editor.getMarkdown(), options.getVersion());
       }
     }, SYNC_DEBOUNCE_MS);
@@ -46,7 +51,12 @@ export function createSyncPlugin(editor: Crepe, options: SyncPluginOptions): Syn
 
   editor.on((listener) => {
     listener.markdownUpdated((_ctx, _markdown) => {
-      if (composing) {
+      if (ignoredChanges > 0) {
+        ignoredChanges -= 1;
+        return;
+      }
+
+      if (composing || suppressed) {
         return;
       }
 
@@ -63,6 +73,19 @@ export function createSyncPlugin(editor: Crepe, options: SyncPluginOptions): Syn
     },
     isComposing() {
       return composing;
+    },
+    isSuppressed() {
+      return suppressed;
+    },
+    setSuppressed(value: boolean) {
+      suppressed = value;
+      if (suppressed) {
+        window.clearTimeout(pendingTimer);
+      }
+    },
+    ignoreNextChange() {
+      ignoredChanges += 1;
+      window.clearTimeout(pendingTimer);
     },
   };
 }

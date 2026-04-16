@@ -1,11 +1,12 @@
 import { Crepe, CrepeFeature } from '@milkdown/crepe';
 import { editorViewCtx, parserCtx, serializerCtx } from '@milkdown/kit/core';
+import { historyProviderConfig } from '@milkdown/kit/plugin/history';
 import { Selection, TextSelection } from '@milkdown/kit/prose/state';
-import { insert, replaceAll } from '@milkdown/utils';
+import { insert } from '@milkdown/utils';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/classic.css';
 import './styles/editor.css';
-import type { HostToWebviewMessage } from '../shared/protocol';
+import type { ExternalUpdateReason, HostToWebviewMessage } from '../shared/protocol';
 import { WebviewBridge } from './bridge';
 import { EditorView as CMEditorView } from '@codemirror/view';
 import { CompletionController } from './completion';
@@ -16,6 +17,7 @@ import { createSyncPlugin, type SyncPluginHandle } from './plugins/sync-plugin';
 
 const COPY_REF_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+const EXTERNAL_UPDATE_IDLE_MS = 250;
 
 const bridge = new WebviewBridge();
 const workspaceRoot = getRequiredElement<HTMLElement>('workspace');
@@ -31,17 +33,32 @@ let syncPlugin: SyncPluginHandle | undefined;
 let completionController: CompletionController | undefined;
 let currentVersion = 0;
 let currentEditable = true;
-let pendingExternalUpdate: string | undefined;
+let currentCompletionsEnabled = true;
+let pendingExternalUpdate:
+  | {
+      markdown: string;
+      version: number;
+      reason?: ExternalUpdateReason;
+    }
+  | undefined;
 let currentFrontmatter: FrontmatterState | undefined;
-let hasPendingLocalChanges = false;
 let requestSequence = 0;
 let lastNonEmptySelection: { from: number; to: number } | undefined;
-
-interface SelectionSnapshot {
-  anchor: number;
-  head: number;
-  hadFocus: boolean;
-}
+let lastKnownSelection: { anchor: number; head: number } | undefined;
+let lastKnownCaretContext:
+  | {
+      blockText: string;
+      parentOffset: number;
+      prefix: string;
+      suffix: string;
+      previousBlockText?: string;
+      nextBlockText?: string;
+    }
+  | undefined;
+let lastEditorInteractionAt = 0;
+let lastTypingAt = 0;
+let pendingExternalUpdateTimer: number | undefined;
+let shouldRestoreSelectionOnWindowFocus = false;
 
 const pendingImageSaveRequests = new Map<
   string,
@@ -64,6 +81,16 @@ frontmatterToggle.addEventListener('click', () => {
   frontmatterToggle.textContent = expanded ? 'Show Raw' : 'Hide Raw';
 });
 
+editorRoot.addEventListener('focusin', markEditorInteraction, true);
+editorRoot.addEventListener('keydown', markEditorInteraction, true);
+editorRoot.addEventListener('keydown', handleHistoryKeydown, true);
+editorRoot.addEventListener('beforeinput', handleHistoryBeforeInput as EventListener, true);
+editorRoot.addEventListener('keydown', restoreSelectionBeforeTyping, true);
+editorRoot.addEventListener('pointerdown', markEditorInteraction, true);
+editorRoot.addEventListener('input', markTypingActivity, true);
+window.addEventListener('blur', handleWindowBlur);
+window.addEventListener('focus', handleWindowFocus);
+
 bridge.onMessage((message) => {
   void handleMessage(message);
 });
@@ -74,19 +101,32 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
   switch (message.type) {
     case 'init':
       currentVersion = message.version;
-      hasPendingLocalChanges = false;
+      pendingExternalUpdate = undefined;
+      window.clearTimeout(pendingExternalUpdateTimer);
+      pendingExternalUpdateTimer = undefined;
       currentEditable = message.editable;
+      currentCompletionsEnabled = message.completionsEnabled;
       await mountEditor(message.markdown);
       return;
-    case 'externalUpdate':
-      currentVersion = message.version;
-      hasPendingLocalChanges = false;
-      await replaceEditorContent(message.markdown);
+    case 'externalUpdate': {
+      const isAuthoritativeEqualVersion =
+        message.version === currentVersion &&
+        message.reason !== 'stale' &&
+        message.reason !== 'edit';
+      if (message.version < currentVersion || (message.version === currentVersion && !isAuthoritativeEqualVersion)) {
+        return;
+      }
+      if (syncPlugin?.isComposing() || shouldDelayExternalUpdate()) {
+        pendingExternalUpdate = { markdown: message.markdown, version: message.version, reason: message.reason };
+        schedulePendingExternalUpdate();
+        return;
+      }
+      await applyExternalUpdate(message.markdown, message.version, message.reason);
       return;
-    case 'setReadonly':
-      currentEditable = message.editable;
-      editor?.setReadonly(!message.editable);
-      completionController?.onReadonlyChange(message.editable);
+    }
+    case 'setCompletionsEnabled':
+      currentCompletionsEnabled = message.enabled;
+      configureCompletionController();
       return;
     case 'hostError':
       statusRoot.textContent = message.message;
@@ -161,6 +201,7 @@ async function mountEditor(markdown: string): Promise<void> {
   const { frontmatter, body } = splitMarkdownFrontmatter(markdown);
   currentFrontmatter = frontmatter;
   lastNonEmptySelection = undefined;
+  lastKnownSelection = undefined;
 
   if (editor) {
     syncPlugin?.dispose();
@@ -172,6 +213,9 @@ async function mountEditor(markdown: string): Promise<void> {
   editor = new Crepe({
     root: editorRoot,
     defaultValue: body,
+    features: {
+      [CrepeFeature.Cursor]: false,
+    },
     featureConfigs: {
       [CrepeFeature.CodeMirror]: {
         renderPreview: renderMermaidPreview,
@@ -201,6 +245,13 @@ async function mountEditor(markdown: string): Promise<void> {
     },
   });
 
+  editor.editor.config((ctx) => {
+    ctx.update(historyProviderConfig.key, (value) => ({
+      ...value,
+      depth: 0,
+    }));
+  });
+
   await editor.create();
   editor.setReadonly(!currentEditable);
 
@@ -210,7 +261,21 @@ async function mountEditor(markdown: string): Promise<void> {
     const originalDispatch = view.dispatch.bind(view);
     view.dispatch = (...args) => {
       originalDispatch(...args);
-      const { from, to } = view.state.selection;
+      const { from, to, anchor, head, $from } = view.state.selection;
+      lastKnownSelection = { anchor, head };
+      if (view.state.selection.empty && $from.parent.isTextblock) {
+        const blockText = $from.parent.textContent;
+        const parentOffset = $from.parentOffset;
+        const surroundingBlocks = getSurroundingTextblocks(view.state.doc, $from.before());
+        lastKnownCaretContext = {
+          blockText,
+          parentOffset,
+          prefix: blockText.slice(Math.max(0, parentOffset - 24), parentOffset),
+          suffix: blockText.slice(parentOffset, parentOffset + 24),
+          previousBlockText: surroundingBlocks.previous,
+          nextBlockText: surroundingBlocks.next,
+        };
+      }
       if (from !== to) {
         lastNonEmptySelection = { from, to };
       }
@@ -218,19 +283,7 @@ async function mountEditor(markdown: string): Promise<void> {
   });
 
   renderFrontmatter(currentFrontmatter);
-  completionController = new CompletionController({
-    root: editorRoot,
-    scrollContainer: workspaceRoot,
-    getMarkdown: () => mergeFrontmatter(currentFrontmatter?.block, editor?.getMarkdown() ?? ''),
-    getVersion: () => getEditorVersion(),
-    getEditable: () => currentEditable,
-    postMessage: (message) => {
-      bridge.postMessage(message);
-    },
-    insertText: (text) => {
-      insertTextAtSelection(text);
-    },
-  });
+  configureCompletionController();
 
   syncPlugin = createSyncPlugin(editor, {
     root: editorRoot,
@@ -240,99 +293,546 @@ async function mountEditor(markdown: string): Promise<void> {
     },
     onCompositionEnd: () => {
       completionController?.onCompositionEnd();
-      if (!pendingExternalUpdate) {
-        return;
-      }
-
-      const next = pendingExternalUpdate;
-      pendingExternalUpdate = undefined;
-      void replaceEditorContent(next);
+      flushPendingExternalUpdate();
     },
     onUserInput: () => {
-      hasPendingLocalChanges = true;
+      markTypingActivity();
       completionController?.onUserInput();
     },
     onMarkdownChange: (nextMarkdown, version) => {
       const nextVersion = Math.max(currentVersion, version + 1);
-      statusRoot.textContent = '';
-      statusRoot.dataset.visible = 'false';
-      statusRoot.dataset.kind = '';
-      renderFrontmatter(currentFrontmatter);
+      clearStatus();
       bridge.postMessage({
         type: 'edit',
         markdown: mergeFrontmatter(currentFrontmatter?.block, nextMarkdown),
         version: nextVersion,
       });
       currentVersion = nextVersion;
-      hasPendingLocalChanges = false;
     },
   });
 
   attachDropHandler(editorRoot);
 }
 
-async function replaceEditorContent(markdown: string): Promise<void> {
-  completionController?.onExternalUpdate();
-
-  if (syncPlugin?.isComposing()) {
-    pendingExternalUpdate = markdown;
+function configureCompletionController(): void {
+  if (!currentCompletionsEnabled) {
+    completionController?.dispose();
+    completionController = undefined;
+    editorRoot.dataset.inlineCompletionVisible = 'false';
     return;
   }
 
+  if (completionController) {
+    return;
+  }
+
+  completionController = new CompletionController({
+    root: editorRoot,
+    scrollContainer: workspaceRoot,
+    getMarkdown: () => mergeFrontmatter(currentFrontmatter?.block, editor?.getMarkdown() ?? ''),
+    getVersion: () => currentVersion,
+    getEditable: () => currentEditable,
+    postMessage: (message) => {
+      bridge.postMessage(message);
+    },
+    insertText: (text) => {
+      insertTextAtSelection(text);
+    },
+  });
+}
+
+async function applyExternalUpdate(
+  markdown: string,
+  version: number,
+  reason: ExternalUpdateReason = 'edit',
+): Promise<void> {
+  currentVersion = version;
+  await replaceEditorContent(markdown, reason);
+}
+
+async function replaceEditorContent(
+  markdown: string,
+  reason: ExternalUpdateReason = 'edit',
+): Promise<void> {
+  completionController?.onExternalUpdate();
+
   pendingExternalUpdate = undefined;
+  window.clearTimeout(pendingExternalUpdateTimer);
+  pendingExternalUpdateTimer = undefined;
   const { frontmatter, body } = splitMarkdownFrontmatter(markdown);
   currentFrontmatter = frontmatter;
   lastNonEmptySelection = undefined;
+  const selectionSnapshot = lastKnownSelection ? { ...lastKnownSelection } : undefined;
+  const scrollSnapshot = captureScrollSnapshot();
 
   if (!editor) {
     await mountEditor(markdown);
     return;
   }
 
-  const selectionSnapshot = captureSelectionSnapshot();
-  editor.editor.action(replaceAll(body, false));
-  restoreSelectionSnapshot(selectionSnapshot);
-  editor.setReadonly(!currentEditable);
+  if (isHistoryReason(reason)) {
+    await mountEditor(markdown);
+    lastKnownSelection = selectionSnapshot;
+    restoreSelectionAfterRemount(scrollSnapshot);
+    return;
+  }
+
+  // Prevent feedback loop: dispatch → markdownUpdated → edit → re-normalize → externalUpdate
+  syncPlugin?.setSuppressed(true);
+  syncPlugin?.ignoreNextChange();
+  try {
+    replaceBodyMinimal(body, reason);
+  } finally {
+    syncPlugin?.setSuppressed(false);
+  }
   renderFrontmatter(currentFrontmatter);
 }
 
-function captureSelectionSnapshot(): SelectionSnapshot | undefined {
+function replaceBodyMinimal(
+  body: string,
+  reason: ExternalUpdateReason = 'edit',
+): void {
   if (!editor) {
-    return undefined;
-  }
-
-  return editor.editor.action((ctx) => {
-    const view = ctx.get(editorViewCtx);
-    return {
-      anchor: view.state.selection.anchor,
-      head: view.state.selection.head,
-      hadFocus: view.hasFocus(),
-    };
-  });
-}
-
-function restoreSelectionSnapshot(snapshot: SelectionSnapshot | undefined): void {
-  if (!editor || !snapshot || !snapshot.hadFocus) {
     return;
   }
 
   editor.editor.action((ctx) => {
     const view = ctx.get(editorViewCtx);
-    const maxPosition = view.state.doc.content.size;
-    const anchor = clampPosition(snapshot.anchor, maxPosition);
-    const head = clampPosition(snapshot.head, maxPosition);
-    const selection = TextSelection.between(
-      view.state.doc.resolve(anchor),
-      view.state.doc.resolve(head),
-    );
+    const shouldRestoreFocus = shouldRestoreEditorFocus(view);
+    const parser = ctx.get(parserCtx);
+    const serializer = ctx.get(serializerCtx);
+    const nextDoc = parser(body);
+    if (!nextDoc) {
+      return;
+    }
 
+    // The TextDocument stores remark-normalized markdown while ProseMirror
+    // holds Milkdown-serialized markdown.  These differ in syntax (e.g.
+    // bullet markers, emphasis style) even when the *content* is identical.
+    // Round-trip the incoming body through PM's own parser→serializer so we
+    // compare like-with-like and avoid a spurious full-document replacement
+    // that destroys cursor position.
+    const currentMd = serializer(view.state.doc);
+    const incomingMd = serializer(nextDoc);
+    if (currentMd === incomingMd) {
+      restoreSelectionAfterAuthoritativeUpdate(view, shouldRestoreFocus, reason);
+      return;
+    }
+
+    const { doc, selection } = view.state;
+
+    const start = doc.content.findDiffStart(nextDoc.content);
+    if (start == null) {
+      restoreSelectionAfterAuthoritativeUpdate(view, shouldRestoreFocus, reason);
+      return;
+    }
+
+    const end = doc.content.findDiffEnd(nextDoc.content);
+    if (!end) {
+      restoreSelectionAfterAuthoritativeUpdate(view, shouldRestoreFocus, reason);
+      return;
+    }
+
+    const overlap = start - Math.min(end.a, end.b);
+    const from = start;
+    const toA = overlap > 0 ? end.a + overlap : end.a;
+    const toB = overlap > 0 ? end.b + overlap : end.b;
+
+    const tr = view.state.tr.replace(from, toA, nextDoc.slice(from, toB));
+    tr.setMeta('addToHistory', false);
+    if ((reason === 'undo' || reason === 'redo') && lastKnownSelection) {
+      const anchor = clampPosition(lastKnownSelection.anchor, tr.doc.content.size);
+      const head = clampPosition(lastKnownSelection.head, tr.doc.content.size);
+      tr.setSelection(TextSelection.between(tr.doc.resolve(anchor), tr.doc.resolve(head)));
+    } else {
+      tr.setSelection(selection.map(tr.doc, tr.mapping));
+    }
+    view.dispatch(tr);
+
+    const { from: nextFrom, to: nextTo, anchor: nextAnchor, head: nextHead } = tr.selection;
+    lastKnownSelection = { anchor: nextAnchor, head: nextHead };
+    if (nextFrom !== nextTo) {
+      lastNonEmptySelection = { from: nextFrom, to: nextTo };
+    }
+
+    if (shouldRestoreFocus) {
+      view.focus();
+    }
+
+    if (isHistoryReason(reason)) {
+      queueDomSelectionSync(view);
+    }
+  });
+}
+
+function restoreSelectionAfterAuthoritativeUpdate(
+  view: import('@milkdown/kit/prose/view').EditorView,
+  shouldRestoreFocus: boolean,
+  reason: ExternalUpdateReason,
+): void {
+  const shouldRestoreSelection = isHistoryReason(reason);
+
+  if (shouldRestoreSelection && lastKnownSelection) {
+    const anchor = clampPosition(lastKnownSelection.anchor, view.state.doc.content.size);
+    const head = clampPosition(lastKnownSelection.head, view.state.doc.content.size);
+    const selection = TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head));
+    view.dispatch(view.state.tr.setSelection(selection));
+  }
+
+  if (shouldRestoreFocus) {
+    view.focus();
+  }
+
+  if (shouldRestoreSelection) {
+    queueDomSelectionSync(view);
+  }
+}
+
+function markEditorInteraction(): void {
+  lastEditorInteractionAt = Date.now();
+  shouldRestoreSelectionOnWindowFocus = true;
+}
+
+function markTypingActivity(): void {
+  lastTypingAt = Date.now();
+  markEditorInteraction();
+
+  if (pendingExternalUpdate) {
+    schedulePendingExternalUpdate();
+  }
+}
+
+function restoreSelectionBeforeTyping(event: KeyboardEvent): void {
+  if (
+    event.defaultPrevented ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    !isTypingKey(event.key) ||
+    hasEditorDomSelection()
+  ) {
+    return;
+  }
+
+  restoreLastKnownSelection();
+}
+
+function handleHistoryKeydown(event: KeyboardEvent): void {
+  if (event.defaultPrevented) {
+    return;
+  }
+
+  const isUndo =
+    event.key.toLowerCase() === 'z' &&
+    ((event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) ||
+      (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey));
+
+  const isRedo =
+    (event.key.toLowerCase() === 'z' &&
+      ((event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey) ||
+        (event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey))) ||
+    (event.key.toLowerCase() === 'y' && event.ctrlKey && !event.metaKey && !event.altKey);
+
+  if (!isUndo && !isRedo) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  bridge.postMessage({
+    type: 'requestHistory',
+    direction: isUndo ? 'undo' : 'redo',
+  });
+}
+
+function handleHistoryBeforeInput(event: InputEvent): void {
+  if (event.defaultPrevented) {
+    return;
+  }
+
+  if (event.inputType !== 'historyUndo' && event.inputType !== 'historyRedo') {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  const direction = event.inputType === 'historyUndo' ? 'undo' : 'redo';
+  bridge.postMessage({
+    type: 'requestHistory',
+    direction,
+  });
+}
+
+function handleWindowBlur(): void {
+  if (!editor) {
+    shouldRestoreSelectionOnWindowFocus = false;
+    return;
+  }
+
+  shouldRestoreSelectionOnWindowFocus = editor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    return view.hasFocus();
+  });
+}
+
+function handleWindowFocus(): void {
+  if (!shouldRestoreSelectionOnWindowFocus) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    if (!shouldRestoreSelectionOnWindowFocus || hasEditorDomSelection()) {
+      return;
+    }
+
+    restoreLastKnownSelection();
+  });
+}
+
+function shouldRestoreEditorFocus(view: import('@milkdown/kit/prose/view').EditorView): boolean {
+  return view.hasFocus() || Date.now() - lastEditorInteractionAt < 1000;
+}
+
+function shouldDelayExternalUpdate(): boolean {
+  return Date.now() - lastTypingAt < EXTERNAL_UPDATE_IDLE_MS;
+}
+
+function schedulePendingExternalUpdate(): void {
+  window.clearTimeout(pendingExternalUpdateTimer);
+  pendingExternalUpdateTimer = window.setTimeout(() => {
+    pendingExternalUpdateTimer = undefined;
+
+    if (!pendingExternalUpdate || syncPlugin?.isComposing() || shouldDelayExternalUpdate()) {
+      if (pendingExternalUpdate) {
+        schedulePendingExternalUpdate();
+      }
+      return;
+    }
+
+    flushPendingExternalUpdate();
+  }, EXTERNAL_UPDATE_IDLE_MS);
+}
+
+function flushPendingExternalUpdate(): void {
+  if (!pendingExternalUpdate) {
+    return;
+  }
+
+  const next = pendingExternalUpdate;
+  if (next.version <= currentVersion) {
+    pendingExternalUpdate = undefined;
+    return;
+  }
+
+  pendingExternalUpdate = undefined;
+  void applyExternalUpdate(next.markdown, next.version, next.reason);
+}
+
+function restoreLastKnownSelection(): void {
+  if (!editor || !lastKnownSelection) {
+    return;
+  }
+
+  editor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const { doc } = view.state;
+    const anchor = clampPosition(lastKnownSelection?.anchor ?? 0, doc.content.size);
+    const head = clampPosition(lastKnownSelection?.head ?? anchor, doc.content.size);
+    const selection = TextSelection.between(doc.resolve(anchor), doc.resolve(head));
     view.dispatch(view.state.tr.setSelection(selection));
     view.focus();
   });
+  shouldRestoreSelectionOnWindowFocus = false;
+}
+
+function restoreSelectionAfterRemount(
+  scrollSnapshot: { workspaceTop: number; windowTop: number },
+): void {
+  if (!editor) {
+    return;
+  }
+
+  editor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const restored = restoreSelectionFromCaretContext(view);
+
+    if (!restored && lastKnownSelection) {
+      const { doc } = view.state;
+      const anchor = clampPosition(lastKnownSelection.anchor, doc.content.size);
+      const head = clampPosition(lastKnownSelection.head, doc.content.size);
+      const selection = TextSelection.between(doc.resolve(anchor), doc.resolve(head));
+      view.dispatch(view.state.tr.setSelection(selection));
+    }
+
+    view.focus();
+    queueDomSelectionSync(view);
+  });
+
+  requestAnimationFrame(() => {
+    workspaceRoot.scrollTop = scrollSnapshot.workspaceTop;
+    window.scrollTo({ top: scrollSnapshot.windowTop });
+  });
+}
+
+function restoreSelectionFromCaretContext(
+  view: import('@milkdown/kit/prose/view').EditorView,
+): boolean {
+  const context = lastKnownCaretContext;
+  if (!context) {
+    return false;
+  }
+
+  let resolvedPos: number | undefined;
+
+  const textblocks = collectTextblocks(view.state.doc);
+
+  for (let index = 0; index < textblocks.length; index += 1) {
+    const { node, pos } = textblocks[index];
+    if (!node.isTextblock) {
+      continue;
+    }
+
+    const text = node.textContent;
+    const previousBlockText = textblocks[index - 1]?.node.textContent;
+    const nextBlockText = textblocks[index + 1]?.node.textContent;
+    const previousMatches =
+      context.previousBlockText == null || previousBlockText === context.previousBlockText;
+    const nextMatches = context.nextBlockText == null || nextBlockText === context.nextBlockText;
+
+    if (!previousMatches || !nextMatches) {
+      continue;
+    }
+
+    const hasPrefix = !context.prefix || text.includes(context.prefix);
+    const hasSuffix = !context.suffix || text.includes(context.suffix);
+    const matchesBlock =
+      text === context.blockText ||
+      (context.blockText.length > 0 && hasPrefix && hasSuffix) ||
+      (context.blockText.length > 0 && text.includes(context.blockText)) ||
+      (text.length > 0 && context.blockText.includes(text));
+
+    if (!matchesBlock) {
+      if (context.blockText.length === 0 && text.length === 0) {
+        resolvedPos = pos + 1;
+        break;
+      }
+      // Undo-back-to-empty: if the candidate block is empty and both neighbor
+      // anchors positively match the stored context, the user has undone all
+      // their typing in this block. `context.blockText` still reflects the
+      // last typed state (non-empty), but block identity is nailed down by
+      // the surrounding blocks — so adopt this empty block as the target.
+      if (
+        text.length === 0 &&
+        context.previousBlockText != null &&
+        context.nextBlockText != null &&
+        previousBlockText === context.previousBlockText &&
+        nextBlockText === context.nextBlockText
+      ) {
+        resolvedPos = pos + 1;
+        break;
+      }
+      continue;
+    }
+
+    const parentOffset = Math.min(context.parentOffset, text.length);
+    resolvedPos = pos + 1 + parentOffset;
+    break;
+  }
+
+  if (resolvedPos == null) {
+    return false;
+  }
+
+  const selection = TextSelection.between(
+    view.state.doc.resolve(resolvedPos),
+    view.state.doc.resolve(resolvedPos),
+  );
+  view.dispatch(view.state.tr.setSelection(selection));
+  return true;
+}
+
+function collectTextblocks(doc: import('@milkdown/kit/prose/model').Node): Array<{
+  node: import('@milkdown/kit/prose/model').Node;
+  pos: number;
+}> {
+  const blocks: Array<{ node: import('@milkdown/kit/prose/model').Node; pos: number }> = [];
+  doc.descendants((node, pos) => {
+    if (node.isTextblock) {
+      blocks.push({ node, pos });
+    }
+  });
+  return blocks;
+}
+
+function getSurroundingTextblocks(
+  doc: import('@milkdown/kit/prose/model').Node,
+  blockPos: number,
+): { previous?: string; next?: string } {
+  let previous: string | undefined;
+  let next: string | undefined;
+  let found = false;
+  doc.descendants((node, pos) => {
+    if (next != null) return false;
+    if (!node.isTextblock) return;
+    if (found) {
+      next = node.textContent;
+      return false;
+    }
+    if (pos === blockPos) {
+      found = true;
+      return false;
+    }
+    previous = node.textContent;
+  });
+  return { previous: found ? previous : undefined, next };
+}
+
+function captureScrollSnapshot(): { workspaceTop: number; windowTop: number } {
+  return {
+    workspaceTop: workspaceRoot.scrollTop,
+    windowTop: window.scrollY,
+  };
+}
+
+function hasEditorDomSelection(): boolean {
+  const selection = window.getSelection();
+
+  if (!selection || selection.rangeCount === 0) {
+    return false;
+  }
+
+  const anchorNode = selection.anchorNode;
+  return Boolean(anchorNode && editorRoot.contains(anchorNode));
+}
+
+function isTypingKey(key: string): boolean {
+  return key.length === 1 || key === 'Enter' || key === 'Backspace' || key === 'Delete';
+}
+
+function isHistoryReason(reason: ExternalUpdateReason | undefined): boolean {
+  return reason === 'undo' || reason === 'redo' || reason === 'revert';
 }
 
 function clampPosition(position: number, maxPosition: number): number {
   return Math.max(0, Math.min(position, maxPosition));
+}
+
+function queueDomSelectionSync(
+  view: import('@milkdown/kit/prose/view').EditorView,
+): void {
+  requestAnimationFrame(() => {
+    if (!editorRoot.isConnected) {
+      return;
+    }
+
+    forceDomSelectionSync(view);
+  });
+}
+
+function forceDomSelectionSync(view: import('@milkdown/kit/prose/view').EditorView): void {
+  view.updateState(view.state);
+  (view as unknown as { domObserver?: { setCurSelection?: () => void } }).domObserver?.setCurSelection?.();
+  view.focus();
 }
 
 function attachDropHandler(root: HTMLElement): void {
@@ -461,10 +961,6 @@ function readFileAsDataUrl(file: File): Promise<string> {
 function nextRequestId(prefix: string): string {
   requestSequence += 1;
   return `${prefix}-${requestSequence}`;
-}
-
-function getEditorVersion(): number {
-  return hasPendingLocalChanges ? currentVersion + 1 : currentVersion;
 }
 
 function clearStatus(): void {

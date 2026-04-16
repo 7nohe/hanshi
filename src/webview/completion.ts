@@ -369,12 +369,17 @@ function getCaretRect(range: Range): DOMRect {
     return lastRect;
   }
 
-  const marker = document.createElement('span');
-  marker.textContent = '\u200b';
-  collapsed.insertNode(marker);
-  const rect = marker.getBoundingClientRect();
-  marker.remove();
-  return rect;
+  const referenceElement = getReferenceElement(collapsed);
+
+  if (referenceElement) {
+    const rect = referenceElement.getBoundingClientRect();
+    const computed = window.getComputedStyle(referenceElement);
+    const lineHeight = Number.parseFloat(computed.lineHeight);
+    const height = Number.isFinite(lineHeight) ? lineHeight : rect.height || 16;
+    return new DOMRect(rect.left, rect.top, 0, height);
+  }
+
+  return new DOMRect(0, 0, 0, 16);
 }
 
 function getReferenceElement(range: Range): HTMLElement | undefined {

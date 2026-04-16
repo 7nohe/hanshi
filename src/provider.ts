@@ -1,8 +1,10 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { InlineCompletionService } from './ai/inline-completion';
-import { DocumentSync } from './sync/document-sync';
+import { safeNormalizeMarkdown } from './sync/markdown-normalizer';
 import type {
+  EditMessage,
+  ExternalUpdateReason,
   HostToWebviewMessage,
   RequestCompletionMessage,
   ResolveImageSrcRequestMessage,
@@ -10,6 +12,11 @@ import type {
   SelectionResponseMessage,
   WebviewToHostMessage,
 } from './shared/protocol';
+
+interface TextBackedDocument {
+  uri: vscode.Uri;
+  getText(): string;
+}
 
 export interface SelectionRange {
   startLine: number;
@@ -21,6 +28,44 @@ export interface SelectionRange {
 export interface SelectionResult extends SelectionRange {
   text: string;
   filePath: string;
+}
+
+class HanshiDocument implements vscode.CustomDocument, TextBackedDocument {
+  private readonly onDidDisposeEmitter = new vscode.EventEmitter<void>();
+  public readonly onDidDispose = this.onDidDisposeEmitter.event;
+  public readonly panels = new Set<vscode.WebviewPanel>();
+  private editQueue: Promise<void> = Promise.resolve();
+
+  public constructor(
+    public readonly uri: vscode.Uri,
+    private text: string,
+    public version = 1,
+  ) {}
+
+  public getText(): string {
+    return this.text;
+  }
+
+  public replaceText(next: string, version = this.version + 1): number {
+    this.text = next;
+    this.version = version;
+    return this.version;
+  }
+
+  public async enqueueEdit<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.editQueue.then(task, task);
+    this.editQueue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  public dispose(): void {
+    this.panels.clear();
+    this.onDidDisposeEmitter.fire();
+    this.onDidDisposeEmitter.dispose();
+  }
 }
 
 export function formatSelectionRef(sel: SelectionResult): string {
@@ -43,12 +88,14 @@ export async function copySelectionRefToClipboard(): Promise<void> {
   void vscode.window.showInformationMessage(`Copied: ${ref}`);
 }
 
-export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
+export class HanshiEditorProvider implements vscode.CustomEditorProvider<HanshiDocument> {
   public static readonly viewType = 'hanshi.markdownEditor';
   private readonly relatedFilesCache = new Map<string, Array<{ path: string; excerpt: string }>>();
+  private readonly onDidChangeCustomDocumentEmitter = new vscode.EventEmitter<vscode.CustomDocumentEditEvent<HanshiDocument>>();
+  public readonly onDidChangeCustomDocument = this.onDidChangeCustomDocumentEmitter.event;
 
   private static activeWebview: vscode.Webview | undefined;
-  private static activeDocument: vscode.TextDocument | undefined;
+  private static activeDocument: TextBackedDocument | undefined;
   private static selectionCallbacks = new Map<string, (response: SelectionResponseMessage) => void>();
   private static requestSequence = 0;
 
@@ -89,8 +136,9 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
       return undefined;
     }
 
-    const startPos = document.positionAt(offsets.start);
-    const endPos = document.positionAt(offsets.end);
+    const textDocument = await vscode.workspace.openTextDocument(document.uri);
+    const startPos = textDocument.positionAt(offsets.start);
+    const endPos = textDocument.positionAt(offsets.end);
 
     return {
       text: response.selectedText,
@@ -102,9 +150,32 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
     };
   }
 
-  public async resolveCustomTextEditor(
-    document: vscode.TextDocument,
+  private getCompletionsEnabled(document: TextBackedDocument): boolean {
+    return vscode.workspace.getConfiguration('hanshi', document.uri).get('aiCompletions.enabled', true);
+  }
+
+  public async openCustomDocument(
+    uri: vscode.Uri,
+    openContext: vscode.CustomDocumentOpenContext,
+    _token: vscode.CancellationToken,
+  ): Promise<HanshiDocument> {
+    const sourceUri = openContext.backupId ? vscode.Uri.parse(openContext.backupId) : uri;
+    const text = await this.readDocumentContents(sourceUri);
+    const document = new HanshiDocument(uri, text);
+
+    document.onDidDispose(() => {
+      if (HanshiEditorProvider.activeDocument === document) {
+        HanshiEditorProvider.activeDocument = undefined;
+      }
+    });
+
+    return document;
+  }
+
+  public async resolveCustomEditor(
+    document: HanshiDocument,
     webviewPanel: vscode.WebviewPanel,
+    _token: vscode.CancellationToken,
   ): Promise<void> {
     const { webview } = webviewPanel;
     webview.options = {
@@ -117,26 +188,10 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
     };
 
     webview.html = this.getHtmlForWebview(webview);
+    document.panels.add(webviewPanel);
+    HanshiEditorProvider.activeWebview = webview;
+    HanshiEditorProvider.activeDocument = document;
 
-    const sync = new DocumentSync({
-      document,
-      postMessage: async (message) => {
-        await webview.postMessage(message);
-      },
-      onWarning: (warning) => {
-        void webview.postMessage({
-          type: 'hostNotice',
-          message: warning,
-        } satisfies HostToWebviewMessage);
-      },
-      onError: (error) => {
-        void vscode.window.showErrorMessage(error.message);
-        void webview.postMessage({
-          type: 'hostError',
-          message: error.message,
-        } satisfies HostToWebviewMessage);
-      },
-    });
     const completions = new InlineCompletionService({
       postMessage: async (message) => {
         await webview.postMessage(message);
@@ -147,28 +202,35 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
           message,
         } satisfies HostToWebviewMessage);
       },
-      getEnabled: () => {
-        return vscode.workspace.getConfiguration('hanshi', document.uri).get('aiCompletions.enabled', true);
-      },
+      getEnabled: () => this.getCompletionsEnabled(document),
       languageModelAccessInformation: this.context.languageModelAccessInformation,
     });
 
-    const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
-      if (event.document.uri.toString() !== document.uri.toString()) {
+    const configurationSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration('hanshi.aiCompletions.enabled', document.uri)) {
         return;
       }
 
-      void sync.handleDocumentChange(event);
+      void webview.postMessage({
+        type: 'setCompletionsEnabled',
+        enabled: this.getCompletionsEnabled(document),
+      } satisfies HostToWebviewMessage);
     });
 
-    webview.onDidReceiveMessage(async (message: WebviewToHostMessage) => {
+    const onDidReceiveMessage = webview.onDidReceiveMessage(async (message: WebviewToHostMessage) => {
       try {
         switch (message.type) {
           case 'ready':
-            await sync.bootstrap(webviewPanel.active);
+            await webview.postMessage({
+              type: 'init',
+              markdown: document.getText(),
+              version: document.version,
+              editable: true,
+              completionsEnabled: this.getCompletionsEnabled(document),
+            } satisfies HostToWebviewMessage);
             return;
           case 'edit':
-            await sync.applyWebviewEdit(message);
+            await this.applyWebviewEdit(document, webviewPanel, message);
             return;
           case 'requestCompletion':
             await completions.handleRequest(await this.enrichCompletionRequest(document, message));
@@ -184,6 +246,9 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
             return;
           case 'copySelectionContext':
             await copySelectionRefToClipboard();
+            return;
+          case 'requestHistory':
+            await vscode.commands.executeCommand(message.direction === 'undo' ? 'undo' : 'redo');
             return;
           case 'selectionResponse': {
             const callback = HanshiEditorProvider.selectionCallbacks.get(message.requestId);
@@ -204,33 +269,182 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
       }
     });
 
-    webviewPanel.onDidChangeViewState(() => {
+    const onDidChangeViewState = webviewPanel.onDidChangeViewState(() => {
       if (webviewPanel.active) {
         HanshiEditorProvider.activeWebview = webview;
         HanshiEditorProvider.activeDocument = document;
       }
-      void webview.postMessage({
-        type: 'setReadonly',
-        editable: !webviewPanel.active ? false : !document.isClosed,
-      } satisfies HostToWebviewMessage);
     });
 
-    HanshiEditorProvider.activeWebview = webview;
-    HanshiEditorProvider.activeDocument = document;
-
     webviewPanel.onDidDispose(() => {
+      document.panels.delete(webviewPanel);
+      onDidReceiveMessage.dispose();
+      onDidChangeViewState.dispose();
+      configurationSubscription.dispose();
+      completions.dispose();
+
       if (HanshiEditorProvider.activeWebview === webview) {
         HanshiEditorProvider.activeWebview = undefined;
         HanshiEditorProvider.activeDocument = undefined;
       }
-      changeSubscription.dispose();
-      completions.dispose();
-      sync.dispose();
     });
   }
 
+  public async saveCustomDocument(
+    document: HanshiDocument,
+    cancellation: vscode.CancellationToken,
+  ): Promise<void> {
+    await this.writeDocumentToUri(document, document.uri, cancellation);
+  }
+
+  public async saveCustomDocumentAs(
+    document: HanshiDocument,
+    destination: vscode.Uri,
+    cancellation: vscode.CancellationToken,
+  ): Promise<void> {
+    await this.writeDocumentToUri(document, destination, cancellation);
+  }
+
+  public async revertCustomDocument(
+    document: HanshiDocument,
+    cancellation: vscode.CancellationToken,
+  ): Promise<void> {
+    throwIfCancelled(cancellation);
+    const text = await this.readDocumentContents(document.uri);
+    document.replaceText(text);
+    await this.broadcastDocumentSnapshot(document, 'revert');
+  }
+
+  public async backupCustomDocument(
+    document: HanshiDocument,
+    context: vscode.CustomDocumentBackupContext,
+    cancellation: vscode.CancellationToken,
+  ): Promise<vscode.CustomDocumentBackup> {
+    throwIfCancelled(cancellation);
+    await vscode.workspace.fs.writeFile(
+      context.destination,
+      new TextEncoder().encode(document.getText()),
+    );
+    return {
+      id: context.destination.toString(),
+      delete: async () => {
+        try {
+          await vscode.workspace.fs.delete(context.destination);
+        } catch {
+          // Ignore cleanup errors for stale backups.
+        }
+      },
+    };
+  }
+
+  private async applyWebviewEdit(
+    document: HanshiDocument,
+    sourcePanel: vscode.WebviewPanel,
+    message: EditMessage,
+  ): Promise<void> {
+    await document.enqueueEdit(async () => {
+      if (message.version < document.version) {
+        await sourcePanel.webview.postMessage({
+          type: 'externalUpdate',
+          markdown: document.getText(),
+          version: document.version,
+          reason: 'stale',
+        } satisfies HostToWebviewMessage);
+        return;
+      }
+
+      const previous = document.getText();
+      const next = message.markdown;
+
+      if (previous === next) {
+        return;
+      }
+
+      document.replaceText(next, message.version);
+      await this.broadcastDocumentSnapshot(document, 'edit', sourcePanel);
+
+      this.onDidChangeCustomDocumentEmitter.fire({
+        document,
+        label: 'Edit Markdown',
+        undo: async () => {
+          document.replaceText(previous);
+          await this.broadcastDocumentSnapshot(document, 'undo');
+        },
+        redo: async () => {
+          document.replaceText(next);
+          await this.broadcastDocumentSnapshot(document, 'redo');
+        },
+      });
+    });
+  }
+
+  private async broadcastDocumentSnapshot(
+    document: HanshiDocument,
+    reason: ExternalUpdateReason,
+    exceptPanel?: vscode.WebviewPanel,
+  ): Promise<void> {
+    await Promise.allSettled(
+      Array.from(document.panels).map(async (panel) => {
+        if (panel === exceptPanel) {
+          return;
+        }
+        await panel.webview.postMessage({
+          type: 'externalUpdate',
+          markdown: document.getText(),
+          version: document.version,
+          reason,
+        } satisfies HostToWebviewMessage);
+      }),
+    );
+  }
+
+  private async writeDocumentToUri(
+    document: HanshiDocument,
+    target: vscode.Uri,
+    cancellation: vscode.CancellationToken,
+  ): Promise<void> {
+    throwIfCancelled(cancellation);
+    const raw = document.getText();
+    const normalized = safeNormalizeMarkdown(raw);
+
+    if (normalized.warning) {
+      await this.showNoticeToDocument(document, normalized.warning);
+    }
+
+    await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(normalized.markdown));
+
+    if (target.toString() === document.uri.toString() && normalized.markdown !== raw) {
+      document.replaceText(normalized.markdown);
+      await this.broadcastDocumentSnapshot(document, 'save-normalize');
+    }
+  }
+
+  private async readDocumentContents(uri: vscode.Uri): Promise<string> {
+    try {
+      const bytes = await vscode.workspace.fs.readFile(uri);
+      return new TextDecoder().decode(bytes);
+    } catch (error) {
+      if (error instanceof vscode.FileSystemError && error.code === 'FileNotFound') {
+        return '';
+      }
+      throw error;
+    }
+  }
+
+  private async showNoticeToDocument(document: HanshiDocument, message: string): Promise<void> {
+    await Promise.allSettled(
+      Array.from(document.panels).map((panel) =>
+        panel.webview.postMessage({
+          type: 'hostNotice',
+          message,
+        } satisfies HostToWebviewMessage),
+      ),
+    );
+  }
+
+
   private async handleSaveImage(
-    document: vscode.TextDocument,
+    document: TextBackedDocument,
     message: SaveImageRequestMessage,
     webview: vscode.Webview,
   ): Promise<void> {
@@ -253,7 +467,7 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   private async handleResolveImageSrc(
-    document: vscode.TextDocument,
+    document: TextBackedDocument,
     message: ResolveImageSrcRequestMessage,
     webview: vscode.Webview,
   ): Promise<void> {
@@ -275,7 +489,7 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   private async persistImage(
-    document: vscode.TextDocument,
+    document: TextBackedDocument,
     name: string,
     dataUrl: string,
   ): Promise<{ alt: string; path: string }> {
@@ -308,7 +522,7 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   private resolveImageSrc(
-    document: vscode.TextDocument,
+    document: TextBackedDocument,
     src: string,
     webview: vscode.Webview,
   ): string {
@@ -327,13 +541,11 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
       throw new Error('Image path escapes the document directory.');
     }
 
-    const resolvedUri = webview.asWebviewUri(vscode.Uri.file(resolvedPath));
-
-    return resolvedUri.toString();
+    return webview.asWebviewUri(vscode.Uri.file(resolvedPath)).toString();
   }
 
   private async enrichCompletionRequest(
-    document: vscode.TextDocument,
+    document: TextBackedDocument,
     message: RequestCompletionMessage,
   ): Promise<RequestCompletionMessage> {
     const relatedFiles = await this.collectRelatedMarkdownFiles(document, message.markdown);
@@ -348,7 +560,7 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   private async collectRelatedMarkdownFiles(
-    document: vscode.TextDocument,
+    document: TextBackedDocument,
     markdown: string,
   ): Promise<Array<{ path: string; excerpt: string }>> {
     const linkedPaths = Array.from(extractMarkdownLinks(markdown)).slice(0, 4);
@@ -406,7 +618,7 @@ export class HanshiEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   private async readRelatedMarkdownFile(
-    document: vscode.TextDocument,
+    document: TextBackedDocument,
     uri: vscode.Uri,
   ): Promise<{ path: string; excerpt: string } | undefined> {
     if (path.extname(uri.fsPath).toLowerCase() !== '.md') {
@@ -584,5 +796,11 @@ export function* extractMarkdownLinks(markdown: string): Generator<string> {
     if (target) {
       yield target;
     }
+  }
+}
+
+function throwIfCancelled(token: vscode.CancellationToken): void {
+  if (token.isCancellationRequested) {
+    throw new vscode.CancellationError();
   }
 }

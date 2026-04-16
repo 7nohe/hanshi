@@ -7,6 +7,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(HanshiEditorProvider.viewType, provider, {
+      supportsMultipleEditorsPerDocument: true,
       webviewOptions: {
         retainContextWhenHidden: true,
       },
