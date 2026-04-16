@@ -209,6 +209,8 @@ body {
   overflow-wrap: anywhere;
   opacity: 0;
   transform: translateY(-1px);
+  max-height: 4lh;
+  overflow: hidden;
 }
 
 .hanshi-inline-completion[data-visible='true'] {

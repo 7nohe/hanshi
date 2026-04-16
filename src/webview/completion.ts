@@ -220,7 +220,7 @@ export class CompletionController {
     const lineElement = findLineElement(range.startContainer, this.options.root);
     const lineRect = lineElement?.getBoundingClientRect() ?? caretRect;
     const firstLineOffset = Math.max(0, caretRect.left - lineRect.left);
-    const availableWidth = Math.max(120, containerRect.right - lineRect.left - 24);
+    const availableWidth = Math.max(120, lineRect.width);
 
     this.overlay.textContent = this.activeCompletion.displayText;
     this.overlay.style.left = `${lineRect.left - containerRect.left + this.options.scrollContainer.scrollLeft}px`;

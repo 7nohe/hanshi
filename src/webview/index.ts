@@ -206,6 +206,7 @@ async function mountEditor(markdown: string): Promise<void> {
   if (editor) {
     syncPlugin?.dispose();
     completionController?.dispose();
+    completionController = undefined;
     await editor.destroy();
   }
 
