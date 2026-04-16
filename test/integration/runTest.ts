@@ -10,7 +10,7 @@ async function main(): Promise<void> {
   const options: TestOptions = {
     extensionDevelopmentPath,
     extensionTestsPath,
-    launchArgs: [workspacePath, '--disable-extensions'],
+    launchArgs: [workspacePath, '--disable-extensions', '--no-sandbox'],
     timeout: 120_000,
   };
 

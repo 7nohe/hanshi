@@ -68,7 +68,7 @@ jobs:
           fi
 
           test -x "$VSCODE_EXECUTABLE_PATH"
-          "$VSCODE_EXECUTABLE_PATH" --version
+          "$VSCODE_EXECUTABLE_PATH" --no-sandbox --version
 
       - name: Integration tests
         run: xvfb-run -a bun run test:integration
