@@ -4,6 +4,7 @@
   "description": "Typora-inspired WYSIWYG Markdown editor for VS Code.",
   "version": "0.0.1",
   "publisher": "hanshi",
+  "private": true,
   "license": "MIT",
   "repository": {
     "type": "git",

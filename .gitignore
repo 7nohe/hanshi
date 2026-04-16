@@ -6,3 +6,13 @@ dist-types
 .agents/plans
 .vscode-test
 .serena
+
+# Secrets & local config
+.env
+.env.*
+*.local
+*.secret
+*.pem
+*.key
+.npmrc
+.claude/settings.local.json
