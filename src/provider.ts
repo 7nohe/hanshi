@@ -501,8 +501,8 @@ export class HanshiEditorProvider implements vscode.CustomEditorProvider<HanshiD
 
     const [, mime, base64] = match;
     const bytes = Buffer.from(base64, 'base64');
-    const rawExt = (mime.split('/')[1] ?? 'png').replace(/[^a-zA-Z0-9]/g, '');
-    const extension = rawExt || 'png';
+    const mimeSubtype = mime.split('/')[1] ?? 'png';
+    const extension = mimeSubtypeToExtension(mimeSubtype);
     const parsed = path.parse(name);
     const safeBaseName = parsed.name.replace(/[^a-zA-Z0-9-_]/g, '-').replace(/-+/g, '-');
     const documentDirectory = path.dirname(document.uri.fsPath);
@@ -704,6 +704,23 @@ export function findSelectionOffsets(
   const matchIndex = sourceText.indexOf(selectedPlainText);
 
   if (matchIndex !== -1) {
+    const secondMatch = sourceText.indexOf(selectedPlainText, matchIndex + 1);
+    if (secondMatch === -1) {
+      return { start: matchIndex, end: matchIndex + selectedPlainText.length };
+    }
+
+    const contextTail = contextBefore.split('\n').filter((l) => l.trim()).pop()?.trim() ?? '';
+    if (contextTail) {
+      let idx = matchIndex;
+      while (idx !== -1) {
+        const preceding = sourceText.slice(Math.max(0, idx - 500), idx);
+        if (preceding.includes(contextTail)) {
+          return { start: idx, end: idx + selectedPlainText.length };
+        }
+        idx = sourceText.indexOf(selectedPlainText, idx + 1);
+      }
+    }
+
     return { start: matchIndex, end: matchIndex + selectedPlainText.length };
   }
 
@@ -797,6 +814,16 @@ export function* extractMarkdownLinks(markdown: string): Generator<string> {
       yield target;
     }
   }
+}
+
+const MIME_SUBTYPE_EXTENSIONS: Record<string, string> = {
+  'svg+xml': 'svg',
+  'jpeg': 'jpg',
+  'tiff': 'tiff',
+};
+
+function mimeSubtypeToExtension(subtype: string): string {
+  return MIME_SUBTYPE_EXTENSIONS[subtype] ?? (subtype.replace(/[^a-zA-Z0-9]/g, '') || 'png');
 }
 
 function throwIfCancelled(token: vscode.CancellationToken): void {

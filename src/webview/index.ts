@@ -371,7 +371,7 @@ async function replaceEditorContent(
     return;
   }
 
-  if (isHistoryReason(reason)) {
+  if (isHistoryReason(reason) && !editor) {
     await mountEditor(markdown);
     lastKnownSelection = selectionSnapshot;
     restoreSelectionAfterRemount(scrollSnapshot);

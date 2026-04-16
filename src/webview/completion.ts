@@ -221,11 +221,13 @@ export class CompletionController {
     const lineRect = lineElement?.getBoundingClientRect() ?? caretRect;
     const firstLineOffset = Math.max(0, caretRect.left - lineRect.left);
     const availableWidth = Math.max(120, lineRect.width);
+    const availableHeight = computeAvailableHeight(lineElement, caretRect);
 
     this.overlay.textContent = this.activeCompletion.displayText;
     this.overlay.style.left = `${lineRect.left - containerRect.left + this.options.scrollContainer.scrollLeft}px`;
     this.overlay.style.top = `${caretRect.top - containerRect.top + this.options.scrollContainer.scrollTop}px`;
     this.overlay.style.maxWidth = `${availableWidth}px`;
+    this.overlay.style.maxHeight = availableHeight ? `${availableHeight}px` : '';
     this.overlay.style.textIndent = `${firstLineOffset}px`;
     this.overlay.dataset.visible = 'true';
     this.options.root.dataset.inlineCompletionVisible = 'true';
@@ -237,6 +239,7 @@ export class CompletionController {
     this.overlay.dataset.visible = 'false';
     this.overlay.textContent = '';
     this.overlay.style.textIndent = '';
+    this.overlay.style.maxHeight = '';
   }
 
   private cancelPendingRequest(): void {
@@ -291,18 +294,24 @@ export class CompletionController {
     suffixRange.selectNodeContents(lineElement);
     suffixRange.setStart(range.startContainer, range.startOffset);
 
-    const blockText = normalizeWhitespace(blockElement.textContent ?? '');
     const prefix = prefixRange.toString();
     const suffix = suffixRange.toString();
-    const before = blockText.slice(0, Math.min(blockText.length, 240));
-    const after = blockText.slice(Math.max(0, blockText.length - 120));
+
+    const blockPrefixRange = document.createRange();
+    blockPrefixRange.selectNodeContents(blockElement);
+    blockPrefixRange.setEnd(range.startContainer, range.startOffset);
+    const blockPrefix = normalizeWhitespace(blockPrefixRange.toString());
+    const blockText = normalizeWhitespace(blockElement.textContent ?? '');
+
+    const before = blockText.slice(Math.max(0, blockPrefix.length - 240), blockPrefix.length);
+    const after = blockText.slice(blockPrefix.length, blockPrefix.length + 120);
 
     return {
       currentLinePrefix: prefix.slice(-200),
       currentLineSuffix: suffix.slice(0, 120),
       surroundingTextBefore: before,
       surroundingTextAfter: after,
-      sectionHeadings: extractSectionHeadings(this.options.getMarkdown(), range),
+      sectionHeadings: extractSectionHeadings(this.options.root, range),
       currentBlockKind: getBlockKind(blockElement),
     };
   }
@@ -400,22 +409,25 @@ function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-function extractSectionHeadings(markdown: string, range: Range): string[] {
-  const selectionText = normalizeWhitespace(range.startContainer.textContent ?? '');
-  const cursorAnchor = selectionText ? markdown.indexOf(selectionText) : -1;
-  const cursorOffset = cursorAnchor >= 0 ? cursorAnchor : markdown.length;
-  const headings = Array.from(markdown.matchAll(/^(#{1,6})\s+(.+)$/gm));
+function extractSectionHeadings(root: HTMLElement, range: Range): string[] {
+  const prosemirror = root.querySelector('.ProseMirror');
+
+  if (!prosemirror) {
+    return [];
+  }
+
+  const headings = Array.from(prosemirror.querySelectorAll('h1, h2, h3, h4, h5, h6'));
   const stack: Array<{ level: number; text: string }> = [];
 
   for (const heading of headings) {
-    const index = heading.index ?? 0;
+    const position = heading.compareDocumentPosition(range.startContainer);
 
-    if (index > cursorOffset) {
+    if (!(position & Node.DOCUMENT_POSITION_FOLLOWING) && heading !== range.startContainer && !heading.contains(range.startContainer)) {
       break;
     }
 
-    const level = heading[1]?.length ?? 1;
-    const text = (heading[2] ?? '').trim();
+    const level = Number.parseInt(heading.tagName[1], 10);
+    const text = (heading.textContent ?? '').trim();
 
     while (stack.length >= level) {
       stack.pop();
@@ -425,6 +437,27 @@ function extractSectionHeadings(markdown: string, range: Range): string[] {
   }
 
   return stack.map((entry) => entry.text).filter(Boolean).slice(-4);
+}
+
+function computeAvailableHeight(
+  lineElement: HTMLElement | null,
+  caretRect: DOMRect,
+): number | undefined {
+  if (!lineElement) {
+    return undefined;
+  }
+
+  const blockParent = lineElement.closest('p, li, h1, h2, h3, h4, h5, h6, blockquote, pre');
+  const reference = blockParent ?? lineElement;
+  const nextSibling = reference.nextElementSibling;
+
+  if (!nextSibling) {
+    return undefined;
+  }
+
+  const nextRect = nextSibling.getBoundingClientRect();
+  const gap = nextRect.top - caretRect.top;
+  return gap > 0 ? gap : undefined;
 }
 
 function getBlockKind(element: HTMLElement): string {
