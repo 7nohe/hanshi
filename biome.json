@@ -4,6 +4,7 @@
     "includes": [
       "**",
       "!dist",
+      "!out",
       "!.git",
       "!node_modules",
       "!.vscode-test",
