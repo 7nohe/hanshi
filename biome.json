@@ -1,20 +1,20 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.11/schema.json",
-  "files": {
-    "includes": [
-      "**",
-      "!dist",
-      "!out",
-      "!.git",
-      "!node_modules",
-      "!.vscode-test",
-      "!.npm-cache"
-    ]
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true
-    }
-  }
+	"$schema": "https://biomejs.dev/schemas/2.4.11/schema.json",
+	"files": {
+		"includes": [
+			"**",
+			"!dist",
+			"!out",
+			"!.git",
+			"!node_modules",
+			"!.vscode-test",
+			"!.npm-cache"
+		]
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true
+		}
+	}
 }

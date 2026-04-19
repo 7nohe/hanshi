@@ -1,331 +1,350 @@
 :root {
-  color-scheme: light dark;
-  --hanshi-bg: var(--vscode-editor-background);
-  --hanshi-fg: var(--vscode-editor-foreground);
-  --hanshi-muted: var(--vscode-descriptionForeground);
-  --hanshi-border: var(--vscode-panel-border);
-  --hanshi-accent: var(--vscode-textLink-foreground);
-  --hanshi-error: var(--vscode-errorForeground);
-  --hanshi-hover: var(--vscode-list-hoverBackground);
-  --hanshi-selected: var(--vscode-list-activeSelectionBackground);
-  --hanshi-inline-code: var(--vscode-textPreformat-foreground);
+	color-scheme: light dark;
+	--hanshi-bg: var(--vscode-editor-background);
+	--hanshi-fg: var(--vscode-editor-foreground);
+	--hanshi-muted: var(--vscode-descriptionForeground);
+	--hanshi-border: var(--vscode-panel-border);
+	--hanshi-accent: var(--vscode-textLink-foreground);
+	--hanshi-error: var(--vscode-errorForeground);
+	--hanshi-hover: var(--vscode-list-hoverBackground);
+	--hanshi-selected: var(--vscode-list-activeSelectionBackground);
+	--hanshi-inline-code: var(--vscode-textPreformat-foreground);
 }
 
 html,
 body,
 #app {
-  width: 100%;
-  height: 100%;
-  margin: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
 }
 
 body {
-  overflow: hidden;
-  background: var(--hanshi-bg);
-  color: var(--hanshi-fg);
-  font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size);
+	overflow: hidden;
+	background: var(--hanshi-bg);
+	color: var(--hanshi-fg);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
 }
 
 #app {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+	display: grid;
+	grid-template-rows: minmax(0, 1fr) auto;
 }
 
 #workspace {
-  position: relative;
-  overflow: auto;
-  padding: 16px 24px 24px;
+	position: relative;
+	overflow: auto;
+	padding: 16px 24px 24px;
 }
 
 #frontmatter,
 #editor .milkdown {
-  max-width: 920px;
-  margin: 0 auto;
+	max-width: 920px;
+	margin: 0 auto;
 }
 
 #frontmatter {
-  display: none;
-  margin-bottom: 16px;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--hanshi-bg) 94%, white 6%);
+	display: none;
+	margin-bottom: 16px;
+	padding: 14px 16px;
+	border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--hanshi-bg) 94%, white 6%);
 }
 
-#frontmatter[data-visible='true'] {
-  display: block;
+#frontmatter[data-visible="true"] {
+	display: block;
 }
 
 #frontmatter-summary {
-  display: grid;
-  gap: 12px;
+	display: grid;
+	gap: 12px;
 }
 
 .hanshi-frontmatter-header {
-  display: grid;
-  gap: 4px;
+	display: grid;
+	gap: 4px;
 }
 
 .hanshi-frontmatter-title {
-  font-weight: 600;
+	font-weight: 600;
 }
 
 .hanshi-frontmatter-subtitle {
-  font-size: 12px;
-  color: var(--hanshi-muted);
+	font-size: 12px;
+	color: var(--hanshi-muted);
 }
 
 .hanshi-frontmatter-warning {
-  font-size: 12px;
-  color: var(--hanshi-error);
+	font-size: 12px;
+	color: var(--hanshi-error);
 }
 
 .hanshi-frontmatter-list {
-  display: grid;
-  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
-  gap: 8px 16px;
-  margin: 0;
+	display: grid;
+	grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+	gap: 8px 16px;
+	margin: 0;
 }
 
 .hanshi-frontmatter-list dt {
-  margin: 0;
-  color: var(--hanshi-muted);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+	margin: 0;
+	color: var(--hanshi-muted);
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
 }
 
 .hanshi-frontmatter-list dd {
-  margin: 0;
-  word-break: break-word;
+	margin: 0;
+	word-break: break-word;
 }
 
 #frontmatter-toggle {
-  margin-top: 12px;
-  border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--hanshi-fg);
-  cursor: pointer;
-  font: inherit;
-  padding: 6px 10px;
+	margin-top: 12px;
+	border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--hanshi-fg);
+	cursor: pointer;
+	font: inherit;
+	padding: 6px 10px;
 }
 
 #frontmatter-toggle:hover {
-  background: color-mix(in srgb, var(--hanshi-hover) 70%, transparent);
+	background: color-mix(in srgb, var(--hanshi-hover) 70%, transparent);
 }
 
 #frontmatter-raw {
-  display: none;
-  margin: 12px 0 0;
-  padding: 12px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--hanshi-bg) 88%, black 12%);
-  color: var(--hanshi-inline-code);
-  font-family: var(--vscode-editor-font-family);
-  font-size: 12px;
-  overflow: auto;
-  white-space: pre-wrap;
+	display: none;
+	margin: 12px 0 0;
+	padding: 12px;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--hanshi-bg) 88%, black 12%);
+	color: var(--hanshi-inline-code);
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+	overflow: auto;
+	white-space: pre-wrap;
 }
 
-#frontmatter[data-expanded='true'] #frontmatter-raw {
-  display: block;
+#frontmatter[data-expanded="true"] #frontmatter-raw {
+	display: block;
 }
 
-#frontmatter[data-expanded='true'] #frontmatter-toggle::after {
-  content: '';
+#frontmatter[data-expanded="true"] #frontmatter-toggle::after {
+	content: "";
 }
 
 #editor .milkdown {
-  --crepe-color-background: var(--hanshi-bg);
-  --crepe-color-on-background: var(--hanshi-fg);
-  --crepe-color-surface: var(--hanshi-bg);
-  --crepe-color-surface-low: color-mix(in srgb, var(--hanshi-bg) 92%, white 8%);
-  --crepe-color-on-surface: var(--hanshi-fg);
-  --crepe-color-on-surface-variant: var(--hanshi-muted);
-  --crepe-color-outline: color-mix(in srgb, var(--hanshi-border) 80%, transparent);
-  --crepe-color-primary: var(--hanshi-accent);
-  --crepe-color-secondary: color-mix(in srgb, var(--hanshi-accent) 12%, var(--hanshi-bg));
-  --crepe-color-on-secondary: var(--hanshi-fg);
-  --crepe-color-inverse: var(--hanshi-fg);
-  --crepe-color-on-inverse: var(--hanshi-bg);
-  --crepe-color-inline-code: var(--hanshi-inline-code);
-  --crepe-color-error: var(--hanshi-error);
-  --crepe-color-hover: var(--hanshi-hover);
-  --crepe-color-selected: var(--hanshi-selected);
-  --crepe-color-inline-area: color-mix(in srgb, var(--hanshi-accent) 10%, var(--hanshi-bg));
-  --crepe-font-default: var(--vscode-font-family);
-  --crepe-font-code: var(--vscode-editor-font-family);
-  min-height: calc(100vh - 96px);
+	--crepe-color-background: var(--hanshi-bg);
+	--crepe-color-on-background: var(--hanshi-fg);
+	--crepe-color-surface: var(--hanshi-bg);
+	--crepe-color-surface-low: color-mix(in srgb, var(--hanshi-bg) 92%, white 8%);
+	--crepe-color-on-surface: var(--hanshi-fg);
+	--crepe-color-on-surface-variant: var(--hanshi-muted);
+	--crepe-color-outline: color-mix(
+		in srgb,
+		var(--hanshi-border) 80%,
+		transparent
+	);
+	--crepe-color-primary: var(--hanshi-accent);
+	--crepe-color-secondary: color-mix(
+		in srgb,
+		var(--hanshi-accent) 12%,
+		var(--hanshi-bg)
+	);
+	--crepe-color-on-secondary: var(--hanshi-fg);
+	--crepe-color-inverse: var(--hanshi-fg);
+	--crepe-color-on-inverse: var(--hanshi-bg);
+	--crepe-color-inline-code: var(--hanshi-inline-code);
+	--crepe-color-error: var(--hanshi-error);
+	--crepe-color-hover: var(--hanshi-hover);
+	--crepe-color-selected: var(--hanshi-selected);
+	--crepe-color-inline-area: color-mix(
+		in srgb,
+		var(--hanshi-accent) 10%,
+		var(--hanshi-bg)
+	);
+	--crepe-font-default: var(--vscode-font-family);
+	--crepe-font-code: var(--vscode-editor-font-family);
+	min-height: calc(100vh - 96px);
 }
 
 #editor .milkdown .ProseMirror {
-  min-height: calc(100vh - 160px);
-  color: var(--hanshi-fg);
-  caret-color: var(--hanshi-accent);
+	min-height: calc(100vh - 160px);
+	color: var(--hanshi-fg);
+	caret-color: var(--hanshi-accent);
 }
 
 #editor .milkdown .ProseMirror img {
-  max-width: 100%;
-  height: auto;
+	max-width: 100%;
+	height: auto;
 }
 
 #editor .milkdown .ProseMirror a {
-  color: var(--hanshi-accent);
+	color: var(--hanshi-accent);
 }
 
 #editor .milkdown .ProseMirror code {
-  color: var(--hanshi-inline-code);
+	color: var(--hanshi-inline-code);
 }
 
 #status {
-  min-height: 24px;
-  padding: 0 24px 12px;
-  font-size: 12px;
-  color: var(--hanshi-muted);
-  opacity: 0;
-  transition: opacity 160ms ease;
+	min-height: 24px;
+	padding: 0 24px 12px;
+	font-size: 12px;
+	color: var(--hanshi-muted);
+	opacity: 0;
+	transition: opacity 160ms ease;
 }
 
-#status[data-visible='true'] {
-  opacity: 1;
+#status[data-visible="true"] {
+	opacity: 1;
 }
 
-#status[data-kind='error'] {
-  color: var(--hanshi-error);
+#status[data-kind="error"] {
+	color: var(--hanshi-error);
 }
 
-#status[data-kind='notice'] {
-  color: var(--hanshi-muted);
+#status[data-kind="notice"] {
+	color: var(--hanshi-muted);
 }
 
 .hanshi-inline-completion {
-  position: absolute;
-  z-index: 20;
-  pointer-events: none;
-  color: color-mix(in srgb, var(--hanshi-muted) 80%, transparent);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  opacity: 0;
-  transform: translateY(-1px);
-  max-height: 4lh;
-  overflow: hidden;
+	position: absolute;
+	z-index: 20;
+	pointer-events: none;
+	color: color-mix(in srgb, var(--hanshi-muted) 80%, transparent);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	opacity: 0;
+	transform: translateY(-1px);
+	max-height: 4lh;
+	overflow: hidden;
 }
 
-.hanshi-inline-completion[data-visible='true'] {
-  opacity: 1;
+.hanshi-inline-completion[data-visible="true"] {
+	opacity: 1;
 }
 
-#editor[data-inline-completion-visible='true'] .crepe-placeholder::before,
-#editor[data-inline-completion-visible='true'] [data-placeholder]::before {
-  opacity: 0;
+#editor[data-inline-completion-visible="true"] .crepe-placeholder::before,
+#editor[data-inline-completion-visible="true"] [data-placeholder]::before {
+	opacity: 0;
 }
 
 #editor .milkdown .milkdown-toolbar {
-  background: var(--vscode-editorWidget-background, color-mix(in srgb, var(--hanshi-fg) 10%, var(--hanshi-bg)));
-  border: 1px solid var(--vscode-editorWidget-border, var(--hanshi-border));
+	background: var(
+		--vscode-editorWidget-background,
+		color-mix(in srgb, var(--hanshi-fg) 10%, var(--hanshi-bg))
+	);
+	border: 1px solid var(--vscode-editorWidget-border, var(--hanshi-border));
 }
 
 #editor .milkdown .milkdown-toolbar .toolbar-item svg {
-  color: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
-  fill: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
-  opacity: 0.72;
+	color: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+	fill: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+	opacity: 0.72;
 }
 
 #editor .milkdown .milkdown-toolbar .toolbar-item:hover svg {
-  opacity: 1;
+	opacity: 1;
 }
 
 #editor .milkdown .milkdown-toolbar .toolbar-item.active svg {
-  color: var(--hanshi-accent);
-  fill: var(--hanshi-accent);
-  opacity: 1;
+	color: var(--hanshi-accent);
+	fill: var(--hanshi-accent);
+	opacity: 1;
 }
 
 #editor .milkdown .milkdown-slash-menu {
-  background: var(--vscode-editorWidget-background, color-mix(in srgb, var(--hanshi-fg) 10%, var(--hanshi-bg)));
-  border: 1px solid var(--vscode-editorWidget-border, var(--hanshi-border));
-  color: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+	background: var(
+		--vscode-editorWidget-background,
+		color-mix(in srgb, var(--hanshi-fg) 10%, var(--hanshi-bg))
+	);
+	border: 1px solid var(--vscode-editorWidget-border, var(--hanshi-border));
+	color: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
 }
 
 #editor .milkdown .milkdown-slash-menu .menu-group li svg {
-  color: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
-  fill: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
-  opacity: 0.72;
+	color: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+	fill: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+	opacity: 0.72;
 }
 
 #editor .milkdown .milkdown-table-block th,
 #editor .milkdown .milkdown-table-block td {
-  border-color: var(--hanshi-border);
+	border-color: var(--hanshi-border);
 }
 
 .hanshi-mermaid-preview {
-  margin: 12px 0 20px;
-  border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--hanshi-bg) 94%, white 6%);
-  overflow: hidden;
+	margin: 12px 0 20px;
+	border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--hanshi-bg) 94%, white 6%);
+	overflow: hidden;
 }
 
 .hanshi-mermaid-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--hanshi-border) 60%, transparent);
-  user-select: none;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 10px;
+	border-bottom: 1px solid
+		color-mix(in srgb, var(--hanshi-border) 60%, transparent);
+	user-select: none;
 }
 
 .hanshi-mermaid-btn {
-  border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--hanshi-fg);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  padding: 2px 8px;
-  line-height: 1.4;
+	border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+	border-radius: 4px;
+	background: transparent;
+	color: var(--hanshi-fg);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	padding: 2px 8px;
+	line-height: 1.4;
 }
 
 .hanshi-mermaid-btn:hover {
-  background: var(--hanshi-hover);
+	background: var(--hanshi-hover);
 }
 
 .hanshi-mermaid-zoom-label {
-  font-size: 11px;
-  color: var(--hanshi-muted);
-  min-width: 40px;
-  text-align: center;
+	font-size: 11px;
+	color: var(--hanshi-muted);
+	min-width: 40px;
+	text-align: center;
 }
 
 .hanshi-mermaid-viewport {
-  overflow: hidden;
-  cursor: grab;
-  min-height: 120px;
-  max-height: min(480px, 65vh);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
+	overflow: hidden;
+	cursor: grab;
+	min-height: 120px;
+	max-height: min(480px, 65vh);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
 }
 
 .hanshi-mermaid-viewport:active {
-  cursor: grabbing;
+	cursor: grabbing;
 }
 
 #editor .milkdown .hanshi-mermaid-preview img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  max-height: min(420px, 60vh);
-  transform-origin: center center;
-  pointer-events: none;
+	display: block;
+	max-width: 100%;
+	height: auto;
+	max-height: min(420px, 60vh);
+	transform-origin: center center;
+	pointer-events: none;
 }
 
 .hanshi-mermaid-preview.is-error {
-  padding: 16px;
-  color: var(--hanshi-error);
-  white-space: pre-wrap;
+	padding: 16px;
+	color: var(--hanshi-error);
+	white-space: pre-wrap;
 }

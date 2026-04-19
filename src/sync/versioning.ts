@@ -1,3 +1,6 @@
-export function isStaleEditVersion(messageVersion: number, documentVersion: number): boolean {
-  return messageVersion < documentVersion;
+export function isStaleEditVersion(
+	messageVersion: number,
+	documentVersion: number,
+): boolean {
+	return messageVersion < documentVersion;
 }
