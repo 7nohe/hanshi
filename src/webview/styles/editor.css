@@ -222,6 +222,39 @@ body {
   opacity: 0;
 }
 
+#editor .milkdown .milkdown-toolbar {
+  background: var(--vscode-editorWidget-background, color-mix(in srgb, var(--hanshi-fg) 10%, var(--hanshi-bg)));
+  border: 1px solid var(--vscode-editorWidget-border, var(--hanshi-border));
+}
+
+#editor .milkdown .milkdown-toolbar .toolbar-item svg {
+  color: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+  fill: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+  opacity: 0.72;
+}
+
+#editor .milkdown .milkdown-toolbar .toolbar-item:hover svg {
+  opacity: 1;
+}
+
+#editor .milkdown .milkdown-toolbar .toolbar-item.active svg {
+  color: var(--hanshi-accent);
+  fill: var(--hanshi-accent);
+  opacity: 1;
+}
+
+#editor .milkdown .milkdown-slash-menu {
+  background: var(--vscode-editorWidget-background, color-mix(in srgb, var(--hanshi-fg) 10%, var(--hanshi-bg)));
+  border: 1px solid var(--vscode-editorWidget-border, var(--hanshi-border));
+  color: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+}
+
+#editor .milkdown .milkdown-slash-menu .menu-group li svg {
+  color: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+  fill: var(--vscode-editorWidget-foreground, var(--hanshi-fg));
+  opacity: 0.72;
+}
+
 #editor .milkdown .milkdown-table-block th,
 #editor .milkdown .milkdown-table-block td {
   border-color: var(--hanshi-border);
