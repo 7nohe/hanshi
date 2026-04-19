@@ -1,133 +1,146 @@
 {
-  "name": "hanshi",
-  "displayName": "Hanshi",
-  "description": "Typora-inspired WYSIWYG Markdown editor for VS Code.",
-  "version": "0.1.0",
-  "publisher": "hanshi",
-  "private": true,
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/7nohe/hanshi.git"
-  },
-  "icon": "assets/logo.png",
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "categories": [
-    "Other",
-    "Programming Languages"
-  ],
-  "keywords": [
-    "markdown",
-    "wysiwyg",
-    "editor",
-    "milkdown",
-    "mermaid"
-  ],
-  "main": "./dist/extension.js",
-  "contributes": {
-    "customEditors": [
-      {
-        "viewType": "hanshi.markdownEditor",
-        "displayName": "Hanshi Markdown Editor",
-        "selector": [
-          {
-            "filenamePattern": "*.md"
-          }
-        ],
-        "priority": "option"
-      }
-    ],
-    "commands": [
-      {
-        "command": "hanshi.open",
-        "title": "Open With Hanshi",
-        "icon": {
-          "light": "assets/icon-light.svg",
-          "dark": "assets/icon-dark.svg"
-        }
-      },
-      {
-        "command": "hanshi.copySelectionContext",
-        "title": "Hanshi: Copy Selection Reference"
-      },
-      {
-        "command": "hanshi.sendSelectionToChat",
-        "title": "Hanshi: Send Selection to Chat"
-      }
-    ],
-    "languageModelTools": [
-      {
-        "name": "hanshi_getSelection",
-        "displayName": "Hanshi: Get Selection",
-        "modelDescription": "Get the currently selected text and its file location from the active Hanshi Markdown editor.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hanshi-selection",
-        "parametersSchema": {}
-      }
-    ],
-    "menus": {
-      "editor/title": [
-        {
-          "command": "hanshi.open",
-          "when": "resourceLangId == markdown && activeEditorId != 'hanshi.markdownEditor'",
-          "group": "navigation"
-        }
-      ]
-    },
-    "keybindings": [
-      {
-        "command": "hanshi.copySelectionContext",
-        "key": "ctrl+shift+c",
-        "mac": "cmd+shift+c",
-        "when": "activeCustomEditorId == 'hanshi.markdownEditor'"
-      }
-    ],
-    "configuration": {
-      "title": "Hanshi",
-      "properties": {
-        "hanshi.aiCompletions.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable AI inline completions in the Hanshi editor when a GitHub Copilot model is available."
-        }
-      }
-    }
-  },
-  "scripts": {
-    "build": "node esbuild.mjs",
-    "watch": "node esbuild.mjs --watch",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.integration.json --noEmit",
-    "check": "bun run typecheck",
-    "lint": "biome lint .",
-    "test": "vitest run",
-    "pretest:integration": "rm -rf out && bun run build && tsc -p tsconfig.integration.json",
-    "test:integration": "node ./out/test/integration/runTest.js",
-    "vscode:prepublish": "bun run build"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.11",
-    "@milkdown/crepe": "^7.20.0",
-    "@milkdown/utils": "^7.20.0",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "^22.15.3",
-    "@types/vscode": "^1.85.0",
-    "@vscode/test-electron": "^2.4.1",
-    "esbuild": "^0.25.3",
-    "glob": "^13.0.6",
-    "mermaid": "^11.6.0",
-    "mocha": "^11.7.5",
-    "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0",
-    "remark-parse": "^11.0.0",
-    "remark-stringify": "^11.0.0",
-    "typescript": "^5.8.3",
-    "unified": "^11.0.5",
-    "vitest": "^1.6.1"
-  },
-  "dependencies": {
-    "yaml": "^2.8.3"
-  }
+	"name": "hanshi",
+	"displayName": "Hanshi",
+	"description": "Typora-inspired WYSIWYG Markdown editor for VS Code.",
+	"version": "0.1.0",
+	"publisher": "hanshi",
+	"private": true,
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/7nohe/hanshi.git"
+	},
+	"icon": "assets/logo.png",
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"categories": [
+		"Other",
+		"Programming Languages"
+	],
+	"keywords": [
+		"markdown",
+		"wysiwyg",
+		"editor",
+		"milkdown",
+		"mermaid"
+	],
+	"main": "./dist/extension.js",
+	"contributes": {
+		"customEditors": [
+			{
+				"viewType": "hanshi.markdownEditor",
+				"displayName": "Hanshi Markdown Editor",
+				"selector": [
+					{
+						"filenamePattern": "*.md"
+					}
+				],
+				"priority": "option"
+			}
+		],
+		"commands": [
+			{
+				"command": "hanshi.open",
+				"title": "Open With Hanshi",
+				"icon": {
+					"light": "assets/icon-light.svg",
+					"dark": "assets/icon-dark.svg"
+				}
+			},
+			{
+				"command": "hanshi.copySelectionContext",
+				"title": "Hanshi: Copy Selection Reference"
+			},
+			{
+				"command": "hanshi.revealHeading",
+				"title": "Hanshi: Reveal Heading"
+			},
+			{
+				"command": "hanshi.sendSelectionToChat",
+				"title": "Hanshi: Send Selection to Chat"
+			}
+		],
+		"languageModelTools": [
+			{
+				"name": "hanshi_getSelection",
+				"displayName": "Hanshi: Get Selection",
+				"modelDescription": "Get the currently selected text and its file location from the active Hanshi Markdown editor.",
+				"canBeReferencedInPrompt": true,
+				"toolReferenceName": "hanshi-selection",
+				"parametersSchema": {}
+			}
+		],
+		"views": {
+			"explorer": [
+				{
+					"id": "hanshi.outline",
+					"name": "Hanshi Outline",
+					"when": "activeCustomEditorId == 'hanshi.markdownEditor'"
+				}
+			]
+		},
+		"menus": {
+			"editor/title": [
+				{
+					"command": "hanshi.open",
+					"when": "resourceLangId == markdown && activeEditorId != 'hanshi.markdownEditor'",
+					"group": "navigation"
+				}
+			]
+		},
+		"keybindings": [
+			{
+				"command": "hanshi.copySelectionContext",
+				"key": "ctrl+shift+c",
+				"mac": "cmd+shift+c",
+				"when": "activeCustomEditorId == 'hanshi.markdownEditor'"
+			}
+		],
+		"configuration": {
+			"title": "Hanshi",
+			"properties": {
+				"hanshi.aiCompletions.enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "Enable AI inline completions in the Hanshi editor when a GitHub Copilot model is available."
+				}
+			}
+		}
+	},
+	"scripts": {
+		"build": "node esbuild.mjs",
+		"watch": "node esbuild.mjs --watch",
+		"typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.integration.json --noEmit",
+		"check": "bun run typecheck",
+		"lint": "biome lint .",
+		"test": "vitest run",
+		"pretest:integration": "rm -rf out && bun run build && tsc -p tsconfig.integration.json",
+		"test:integration": "node ./out/test/integration/runTest.js",
+		"vscode:prepublish": "bun run build"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.11",
+		"@milkdown/crepe": "^7.20.0",
+		"@milkdown/utils": "^7.20.0",
+		"@types/mocha": "^10.0.10",
+		"@types/node": "^22.15.3",
+		"@types/vscode": "^1.85.0",
+		"@vscode/test-electron": "^2.4.1",
+		"esbuild": "^0.25.3",
+		"glob": "^13.0.6",
+		"mermaid": "^11.6.0",
+		"mocha": "^11.7.5",
+		"remark-frontmatter": "^5.0.0",
+		"remark-gfm": "^4.0.1",
+		"remark-math": "^6.0.0",
+		"remark-parse": "^11.0.0",
+		"remark-stringify": "^11.0.0",
+		"typescript": "^5.8.3",
+		"unified": "^11.0.5",
+		"vitest": "^1.6.1"
+	},
+	"dependencies": {
+		"yaml": "^2.8.3"
+	}
 }
