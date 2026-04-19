@@ -42,7 +42,11 @@
     "commands": [
       {
         "command": "hanshi.open",
-        "title": "Open With Hanshi"
+        "title": "Open With Hanshi",
+        "icon": {
+          "light": "assets/icon-light.svg",
+          "dark": "assets/icon-dark.svg"
+        }
       },
       {
         "command": "hanshi.copySelectionContext",
@@ -63,6 +67,15 @@
         "parametersSchema": {}
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "hanshi.open",
+          "when": "resourceLangId == markdown && activeEditorId != 'hanshi.markdownEditor'",
+          "group": "navigation"
+        }
+      ]
+    },
     "keybindings": [
       {
         "command": "hanshi.copySelectionContext",
