@@ -160,7 +160,8 @@ export class HanshiEditorProvider implements vscode.CustomEditorProvider<HanshiD
     _token: vscode.CancellationToken,
   ): Promise<HanshiDocument> {
     const sourceUri = openContext.backupId ? vscode.Uri.parse(openContext.backupId) : uri;
-    const text = await this.readDocumentContents(sourceUri);
+    const raw = await this.readDocumentContents(sourceUri);
+    const { markdown: text } = safeNormalizeMarkdown(raw);
     const document = new HanshiDocument(uri, text);
 
     document.onDidDispose(() => {
@@ -310,7 +311,8 @@ export class HanshiEditorProvider implements vscode.CustomEditorProvider<HanshiD
     cancellation: vscode.CancellationToken,
   ): Promise<void> {
     throwIfCancelled(cancellation);
-    const text = await this.readDocumentContents(document.uri);
+    const raw = await this.readDocumentContents(document.uri);
+    const { markdown: text } = safeNormalizeMarkdown(raw);
     document.replaceText(text);
     await this.broadcastDocumentSnapshot(document, 'revert');
   }
@@ -354,7 +356,7 @@ export class HanshiEditorProvider implements vscode.CustomEditorProvider<HanshiD
       }
 
       const previous = document.getText();
-      const next = message.markdown;
+      const { markdown: next } = safeNormalizeMarkdown(message.markdown);
 
       if (previous === next) {
         return;

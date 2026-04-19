@@ -13,6 +13,22 @@ describe('normalizeMarkdown', () => {
     expect(normalizeMarkdown(input)).toContain('日本語の段落です。');
   });
 
+  it('is idempotent — normalizing twice produces the same result', () => {
+    const inputs = [
+      '* one\n* two',
+      '# Title\n\n__bold__ and _italic_\n\n~~~js\ncode\n~~~\n',
+      '---\ntitle: hello\n---\n\n+ item\n  + nested\n',
+      '> quote\n>\n> continued\n\n***\n',
+      '1.  first\n2.  second\n',
+    ];
+
+    for (const input of inputs) {
+      const first = normalizeMarkdown(input);
+      const second = normalizeMarkdown(first);
+      expect(second).toBe(first);
+    }
+  });
+
   it('falls back to raw markdown when normalization throws', () => {
     const result = safeNormalizeMarkdown('abc', {
       parse() {
