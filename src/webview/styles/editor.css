@@ -167,7 +167,14 @@ body {
 		var(--hanshi-accent) 10%,
 		var(--hanshi-bg)
 	);
-	--crepe-font-default: var(--vscode-font-family);
+	--crepe-font-default: var(
+		--hanshi-editor-font-default,
+		"Open Sans", Arial, Helvetica, sans-serif
+	);
+	--crepe-font-title: var(
+		--hanshi-editor-font-title,
+		Georgia, Cambria, "Times New Roman", Times, serif
+	);
 	--crepe-font-code: var(--vscode-editor-font-family);
 	min-height: calc(100vh - 96px);
 }
@@ -176,6 +183,7 @@ body {
 	min-height: calc(100vh - 160px);
 	color: var(--hanshi-fg);
 	caret-color: var(--hanshi-accent);
+	font-family: var(--crepe-font-default);
 }
 
 #editor .milkdown .ProseMirror img {

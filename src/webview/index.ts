@@ -113,6 +113,19 @@ bridge.onMessage((message) => {
 
 bridge.postMessage({ type: "ready" });
 
+function applyFontConfig(fontFamily: string, titleFontFamily: string): void {
+	if (fontFamily) {
+		editorRoot.style.setProperty("--hanshi-editor-font-default", fontFamily);
+	} else {
+		editorRoot.style.removeProperty("--hanshi-editor-font-default");
+	}
+	if (titleFontFamily) {
+		editorRoot.style.setProperty("--hanshi-editor-font-title", titleFontFamily);
+	} else {
+		editorRoot.style.removeProperty("--hanshi-editor-font-title");
+	}
+}
+
 async function handleMessage(message: HostToWebviewMessage): Promise<void> {
 	switch (message.type) {
 		case "init":
@@ -123,6 +136,7 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
 			currentEditable = message.editable;
 			currentCompletionsEnabled = message.completionsEnabled;
 			await mountEditor(message.markdown);
+			applyFontConfig(message.fontFamily, message.titleFontFamily);
 			return;
 		case "externalUpdate": {
 			const isAuthoritativeEqualVersion =
@@ -154,6 +168,9 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
 		case "setCompletionsEnabled":
 			currentCompletionsEnabled = message.enabled;
 			configureCompletionController();
+			return;
+		case "setFont":
+			applyFontConfig(message.fontFamily, message.titleFontFamily);
 			return;
 		case "hostError":
 			statusRoot.textContent = message.message;

@@ -188,6 +188,16 @@ export class HanshiEditorProvider
 			.get("aiCompletions.enabled", true);
 	}
 
+	private getEditorFonts(
+		document: TextBackedDocument,
+	): { fontFamily: string; titleFontFamily: string } {
+		const config = vscode.workspace.getConfiguration("hanshi", document.uri);
+		return {
+			fontFamily: config.get("editor.fontFamily", ""),
+			titleFontFamily: config.get("editor.titleFontFamily", ""),
+		};
+	}
+
 	public async openCustomDocument(
 		uri: vscode.Uri,
 		openContext: vscode.CustomDocumentOpenContext,
@@ -248,18 +258,29 @@ export class HanshiEditorProvider
 		const configurationSubscription = vscode.workspace.onDidChangeConfiguration(
 			(event) => {
 				if (
-					!event.affectsConfiguration(
+					event.affectsConfiguration(
 						"hanshi.aiCompletions.enabled",
 						document.uri,
 					)
 				) {
-					return;
+					void webview.postMessage({
+						type: "setCompletionsEnabled",
+						enabled: this.getCompletionsEnabled(document),
+					} satisfies HostToWebviewMessage);
 				}
 
-				void webview.postMessage({
-					type: "setCompletionsEnabled",
-					enabled: this.getCompletionsEnabled(document),
-				} satisfies HostToWebviewMessage);
+				if (
+					event.affectsConfiguration("hanshi.editor.fontFamily", document.uri) ||
+					event.affectsConfiguration(
+						"hanshi.editor.titleFontFamily",
+						document.uri,
+					)
+				) {
+					void webview.postMessage({
+						type: "setFont",
+						...this.getEditorFonts(document),
+					} satisfies HostToWebviewMessage);
+				}
 			},
 		);
 
@@ -274,6 +295,7 @@ export class HanshiEditorProvider
 								version: document.version,
 								editable: true,
 								completionsEnabled: this.getCompletionsEnabled(document),
+								...this.getEditorFonts(document),
 							} satisfies HostToWebviewMessage);
 							return;
 						case "edit":
