@@ -3,10 +3,19 @@ export interface MarkdownSnapshot {
 	version: number;
 }
 
-export interface InitMessage extends MarkdownSnapshot {
+export interface FontConfig {
+	fontFamily: string;
+	titleFontFamily: string;
+}
+
+export interface InitMessage extends MarkdownSnapshot, FontConfig {
 	type: "init";
 	editable: boolean;
 	completionsEnabled: boolean;
+}
+
+export interface SetFontMessage extends FontConfig {
+	type: "setFont";
 }
 
 export type ExternalUpdateReason =
@@ -81,6 +90,7 @@ export type HostToWebviewMessage =
 	| InitMessage
 	| ExternalUpdateMessage
 	| SetCompletionsEnabledMessage
+	| SetFontMessage
 	| HostErrorMessage
 	| HostNoticeMessage
 	| SaveImageResultMessage
@@ -168,6 +178,7 @@ const HOST_TO_WEBVIEW_TYPES = new Set<string>([
 	"init",
 	"externalUpdate",
 	"setCompletionsEnabled",
+	"setFont",
 	"hostError",
 	"hostNotice",
 	"saveImageResult",

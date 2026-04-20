@@ -100,6 +100,16 @@
 		"configuration": {
 			"title": "Hanshi",
 			"properties": {
+				"hanshi.editor.fontFamily": {
+					"type": "string",
+					"default": "",
+					"description": "Font family for the editor body text. Leave empty to use VS Code's font."
+				},
+				"hanshi.editor.titleFontFamily": {
+					"type": "string",
+					"default": "",
+					"description": "Font family for headings. Leave empty to use the body font."
+				},
 				"hanshi.aiCompletions.enabled": {
 					"type": "boolean",
 					"default": true,
