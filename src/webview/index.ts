@@ -1,8 +1,10 @@
 import { Crepe, CrepeFeature } from "@milkdown/crepe";
-import { editorViewCtx, parserCtx, serializerCtx } from "@milkdown/kit/core";
+import { editorViewCtx, parserCtx, remarkStringifyOptionsCtx, serializerCtx } from "@milkdown/kit/core";
+import { remarkGFMPlugin } from "@milkdown/kit/preset/gfm";
 import { historyProviderConfig } from "@milkdown/kit/plugin/history";
 import { Selection, TextSelection } from "@milkdown/kit/prose/state";
 import { insert } from "@milkdown/utils";
+import { defaultHandlers } from "mdast-util-to-markdown";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic.css";
 import "./styles/editor.css";
@@ -302,6 +304,24 @@ async function mountEditor(markdown: string): Promise<void> {
 			...value,
 			depth: 0,
 		}));
+		ctx.update(remarkStringifyOptionsCtx, (prev) => ({
+			...prev,
+			bullet: '-' as const,
+			emphasis: '*' as const,
+			strong: '*' as const,
+			fence: '`' as const,
+			fences: true,
+			listItemIndent: 'one' as const,
+			rule: '-' as const,
+			handlers: {
+				...prev.handlers,
+				list(node, parent, state, info) {
+					fixMdastSpread(node);
+					return defaultHandlers.list(node, parent, state, info);
+				},
+			},
+		}));
+		ctx.set(remarkGFMPlugin.options.key, { tablePipeAlign: false });
 	});
 
 	await editor.create();
@@ -1310,6 +1330,21 @@ function buildFrontmatterSummary(state: FrontmatterState): DocumentFragment {
 
 	fragment.append(list);
 	return fragment;
+}
+
+// Milkdown stores the mdast `spread` attribute as a string ('true'/'false')
+// instead of a boolean. remark-stringify treats the string 'false' as truthy,
+// causing tight lists to be serialized as loose. This function walks the mdast
+// list subtree and coerces spread back to a proper boolean before stringify.
+function fixMdastSpread(node: { spread?: unknown; children?: unknown[] }): void {
+  if (node.spread != null) {
+    node.spread = node.spread === true || node.spread === 'true';
+  }
+  if (node.children) {
+    for (const child of node.children as Array<{ spread?: unknown; children?: unknown[] }>) {
+      fixMdastSpread(child);
+    }
+  }
 }
 
 function getRequiredElement<T extends HTMLElement>(id: string): T {

@@ -26,6 +26,10 @@ describe("normalizeMarkdown", () => {
 			"---\ntitle: hello\n---\n\n+ item\n  + nested\n",
 			"> quote\n>\n> continued\n\n***\n",
 			"1.  first\n2.  second\n",
+			"| H1 | H2 |\n| :--- | :--- |\n| a | b |\n",
+			"- [x] done\n- [ ] todo\n",
+			"- tight 1\n- tight 2\n  - nested\n",
+			"- loose 1\n\n- loose 2\n",
 		];
 
 		for (const input of inputs) {
@@ -33,6 +37,23 @@ describe("normalizeMarkdown", () => {
 			const second = normalizeMarkdown(first);
 			expect(second).toBe(first);
 		}
+	});
+
+	it("does not pad table columns to align pipes", () => {
+		const input =
+			"| hoge | fuga | foo |\n| :--- | :--- | :--- |\n| baa | long text | 2 |\n| 3 | 4 | 5 |\n";
+		const result = normalizeMarkdown(input);
+		expect(result).not.toMatch(/\| baa {2,}/);
+	});
+
+	it("preserves tight list tightness", () => {
+		const tight = "- one\n- two\n- three\n";
+		expect(normalizeMarkdown(tight)).toBe(tight);
+	});
+
+	it("preserves loose list tightness", () => {
+		const loose = "- one\n\n- two\n\n- three\n";
+		expect(normalizeMarkdown(loose)).toBe(loose);
 	});
 
 	it("falls back to raw markdown when normalization throws", () => {

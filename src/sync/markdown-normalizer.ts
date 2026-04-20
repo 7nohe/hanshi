@@ -8,7 +8,7 @@ import { unified } from "unified";
 const processor = unified()
 	.use(remarkParse)
 	.use(remarkFrontmatter, ["yaml"])
-	.use(remarkGfm)
+	.use(remarkGfm, { tablePipeAlign: false })
 	.use(remarkMath)
 	.use(remarkStringify, {
 		bullet: "-",
