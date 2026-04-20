@@ -61,6 +61,16 @@ export interface ResolveImageSrcResultMessage {
 	error?: string;
 }
 
+export interface FetchLinkPreviewResultMessage {
+	type: "fetchLinkPreviewResult";
+	requestId: string;
+	title?: string;
+	description?: string;
+	imageUrl?: string;
+	siteName?: string;
+	error?: string;
+}
+
 export interface CompletionResultMessage {
 	type: "completionResult";
 	requestId: string;
@@ -95,6 +105,7 @@ export type HostToWebviewMessage =
 	| HostNoticeMessage
 	| SaveImageResultMessage
 	| ResolveImageSrcResultMessage
+	| FetchLinkPreviewResultMessage
 	| CompletionResultMessage
 	| CompletionClearedMessage
 	| GetSelectionMessage
@@ -146,6 +157,12 @@ export interface CancelCompletionMessage
 	requestId?: string;
 }
 
+export interface FetchLinkPreviewRequestMessage {
+	type: "fetchLinkPreviewRequest";
+	requestId: string;
+	url: string;
+}
+
 export interface SelectionResponseMessage {
 	type: "selectionResponse";
 	requestId: string;
@@ -168,6 +185,7 @@ export type WebviewToHostMessage =
 	| ReadyMessage
 	| SaveImageRequestMessage
 	| ResolveImageSrcRequestMessage
+	| FetchLinkPreviewRequestMessage
 	| RequestCompletionMessage
 	| CancelCompletionMessage
 	| SelectionResponseMessage
@@ -183,6 +201,7 @@ const HOST_TO_WEBVIEW_TYPES = new Set<string>([
 	"hostNotice",
 	"saveImageResult",
 	"resolveImageSrcResult",
+	"fetchLinkPreviewResult",
 	"completionResult",
 	"completionCleared",
 	"getSelection",
@@ -194,6 +213,7 @@ const WEBVIEW_TO_HOST_TYPES = new Set<string>([
 	"ready",
 	"saveImageRequest",
 	"resolveImageSrcRequest",
+	"fetchLinkPreviewRequest",
 	"requestCompletion",
 	"cancelCompletion",
 	"selectionResponse",
