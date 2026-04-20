@@ -67,6 +67,8 @@ export function renderMermaidPreview(
 					`<span class="hanshi-mermaid-zoom-label">100%</span>` +
 					`<button class="hanshi-mermaid-btn" data-zoom="1" title="Zoom in">+</button>` +
 					`<button class="hanshi-mermaid-btn" data-zoom="0" title="Reset zoom">Reset</button>` +
+					`<span style="flex:1"></span>` +
+					`<button class="hanshi-mermaid-btn hanshi-mermaid-fullscreen-btn" data-fullscreen title="Fullscreen">&#x26F6;</button>` +
 					`</div>` +
 					`<div class="hanshi-mermaid-viewport" data-scale="1" data-pan-x="0" data-pan-y="0">` +
 					`<img src="${dataUrl}" alt="Mermaid diagram preview" />` +
@@ -87,6 +89,16 @@ function installDelegation(): void {
 	delegationInstalled = true;
 
 	document.addEventListener("click", (e) => {
+		const fsBtn = (e.target as HTMLElement).closest<HTMLElement>(
+			".hanshi-mermaid-btn[data-fullscreen]",
+		);
+		if (fsBtn) {
+			e.stopPropagation();
+			const preview = fsBtn.closest<HTMLElement>(".hanshi-mermaid-preview");
+			if (preview) toggleFullscreen(preview);
+			return;
+		}
+
 		const btn = (e.target as HTMLElement).closest<HTMLElement>(
 			".hanshi-mermaid-btn[data-zoom]",
 		);
@@ -159,6 +171,27 @@ function installDelegation(): void {
 	document.addEventListener("pointercancel", () => {
 		dragViewport = null;
 	});
+
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape") {
+			const active = document.querySelector<HTMLElement>(
+				".hanshi-mermaid-preview.is-fullscreen",
+			);
+			if (active) {
+				e.stopPropagation();
+				toggleFullscreen(active);
+			}
+		}
+	});
+}
+
+function toggleFullscreen(preview: HTMLElement): void {
+	const isFs = preview.classList.toggle("is-fullscreen");
+	const btn = preview.querySelector<HTMLElement>(".hanshi-mermaid-fullscreen-btn");
+	if (btn) {
+		btn.innerHTML = isFs ? "&#x2716;" : "&#x26F6;";
+		btn.title = isFs ? "Exit fullscreen" : "Fullscreen";
+	}
 }
 
 function clampScale(value: number): number {

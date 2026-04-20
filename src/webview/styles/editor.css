@@ -273,6 +273,33 @@ body {
 	opacity: 0.72;
 }
 
+#editor .milkdown .milkdown-list-item-block li .label-wrapper {
+	color: var(--hanshi-muted);
+}
+
+#editor .milkdown .milkdown-list-item-block li .label-wrapper svg {
+	fill: var(--hanshi-muted);
+}
+
+#editor .milkdown .milkdown-code-block:not(:has(.hanshi-mermaid-preview)) {
+	--crepe-color-surface: color-mix(in srgb, var(--hanshi-bg) 94%, white 6%);
+	padding: 0 0 8px;
+}
+
+#editor .milkdown .milkdown-code-block:not(:has(.hanshi-mermaid-preview)) > .tools {
+	height: 0;
+	overflow: visible;
+	position: relative;
+	z-index: 2;
+}
+
+#editor
+	.milkdown
+	.milkdown-code-block:not(:has(.hanshi-mermaid-preview)):hover
+	> .tools {
+	height: auto;
+}
+
 #editor .milkdown .milkdown-table-block th,
 #editor .milkdown .milkdown-table-block td {
 	border-color: var(--hanshi-border);
@@ -341,6 +368,23 @@ body {
 	max-height: min(420px, 60vh);
 	transform-origin: center center;
 	pointer-events: none;
+}
+
+.hanshi-mermaid-preview.is-fullscreen {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	margin: 0;
+	border: none;
+	border-radius: 0;
+	max-height: none;
+	display: flex;
+	flex-direction: column;
+}
+
+.hanshi-mermaid-preview.is-fullscreen .hanshi-mermaid-viewport {
+	flex: 1;
+	max-height: none;
 }
 
 .hanshi-mermaid-preview.is-error {
