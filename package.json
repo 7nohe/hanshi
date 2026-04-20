@@ -2,7 +2,7 @@
 	"name": "hanshi",
 	"displayName": "Hanshi",
 	"description": "Typora-inspired WYSIWYG Markdown editor for VS Code.",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"publisher": "hanshi",
 	"private": true,
 	"license": "MIT",
