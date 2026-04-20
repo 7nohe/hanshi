@@ -313,6 +313,159 @@ body {
 	border-color: var(--hanshi-border);
 }
 
+.hanshi-link-preview {
+	position: absolute;
+	z-index: 50;
+	max-width: 360px;
+	border: 1px solid var(--hanshi-border);
+	border-radius: 8px;
+	background: var(
+		--vscode-editorWidget-background,
+		color-mix(in srgb, var(--hanshi-fg) 10%, var(--hanshi-bg))
+	);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	overflow: hidden;
+	opacity: 0;
+	transition: opacity 120ms ease;
+	pointer-events: auto;
+}
+
+.hanshi-link-preview[data-visible="true"] {
+	opacity: 1;
+}
+
+.hanshi-link-preview-image {
+	width: 100%;
+	height: 120px;
+	object-fit: cover;
+	display: block;
+}
+
+.hanshi-link-preview-body {
+	padding: 10px 12px;
+}
+
+.hanshi-link-preview-title {
+	font-weight: 600;
+	font-size: 13px;
+	line-height: 1.3;
+	margin: 0 0 4px;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.hanshi-link-preview-description {
+	font-size: 12px;
+	color: var(--hanshi-muted);
+	line-height: 1.4;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.hanshi-link-preview-site {
+	font-size: 11px;
+	color: var(--hanshi-muted);
+	margin-top: 6px;
+}
+
+.hanshi-link-preview-loading {
+	padding: 16px;
+	text-align: center;
+	font-size: 12px;
+	color: var(--hanshi-muted);
+}
+
+.hanshi-link-card-wrapper {
+	margin: 8px 0 12px;
+	user-select: none;
+}
+
+.hanshi-link-card {
+	display: flex;
+	align-items: stretch;
+	max-width: 500px;
+	border: 1px solid var(--hanshi-border);
+	border-radius: 8px;
+	background: var(
+		--vscode-editorWidget-background,
+		color-mix(in srgb, var(--hanshi-fg) 6%, var(--hanshi-bg))
+	);
+	overflow: hidden;
+	text-decoration: none;
+	color: inherit;
+	transition: border-color 120ms ease;
+	cursor: pointer;
+}
+
+.hanshi-link-card:hover {
+	border-color: var(--hanshi-accent);
+}
+
+.hanshi-link-card-thumb {
+	width: 160px;
+	flex-shrink: 0;
+	overflow: hidden;
+}
+
+#editor .milkdown .ProseMirror .hanshi-link-card-thumb img {
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	object-fit: cover;
+	display: block;
+}
+
+.hanshi-link-card .hanshi-link-preview-body {
+	padding: 8px 12px;
+	min-width: 0;
+}
+
+#editor .milkdown .ProseMirror a.hanshi-link-card,
+#editor .milkdown .ProseMirror a.hanshi-link-card:hover,
+#editor .milkdown .ProseMirror a.hanshi-link-card:visited {
+	color: var(--hanshi-fg);
+	text-decoration: none;
+}
+
+.hanshi-link-card .hanshi-link-preview-title {
+	font-weight: 600;
+	font-size: 13px;
+	line-height: 1.3;
+	margin: 0 0 4px;
+	color: var(--hanshi-fg);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.hanshi-link-card .hanshi-link-preview-description {
+	font-size: 12px;
+	color: var(--hanshi-muted);
+	line-height: 1.4;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.hanshi-link-card .hanshi-link-preview-site {
+	font-size: 11px;
+	color: var(--hanshi-muted);
+	margin-top: 4px;
+}
+
+.hanshi-link-card-loading {
+	padding: 14px;
+	text-align: center;
+	font-size: 12px;
+	color: var(--hanshi-muted);
+}
+
 .hanshi-mermaid-preview {
 	margin: 12px 0 20px;
 	border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);

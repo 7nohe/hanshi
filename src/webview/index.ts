@@ -1,5 +1,5 @@
 import { Crepe, CrepeFeature } from "@milkdown/crepe";
-import { editorViewCtx, parserCtx, remarkStringifyOptionsCtx, serializerCtx } from "@milkdown/kit/core";
+import { editorViewCtx, parserCtx, prosePluginsCtx, remarkStringifyOptionsCtx, serializerCtx } from "@milkdown/kit/core";
 import { remarkGFMPlugin } from "@milkdown/kit/preset/gfm";
 import { historyProviderConfig } from "@milkdown/kit/plugin/history";
 import { Selection, TextSelection } from "@milkdown/kit/prose/state";
@@ -22,6 +22,7 @@ import {
 } from "./frontmatter";
 import { createImageMarkdown } from "./markdown";
 import { renderMermaidPreview } from "./plugins/mermaid-block";
+import { createLinkPreviewPlugin } from "./plugins/link-preview";
 import { createSyncPlugin, type SyncPluginHandle } from "./plugins/sync-plugin";
 
 const COPY_REF_ICON =
@@ -42,6 +43,7 @@ const statusRoot = getRequiredElement<HTMLElement>("status");
 
 let editor: Crepe | undefined;
 let syncPlugin: SyncPluginHandle | undefined;
+let linkPreviewSettle: ((msg: import("../shared/protocol").FetchLinkPreviewResultMessage) => void) | undefined;
 let completionController: CompletionController | undefined;
 let currentVersion = 0;
 let currentEditable = true;
@@ -188,6 +190,9 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
 		case "resolveImageSrcResult":
 			settleImageSrcRequest(message);
 			return;
+		case "fetchLinkPreviewResult":
+			linkPreviewSettle?.(message);
+			return;
 		case "completionResult":
 			completionController?.applyCompletionResult(message);
 			return;
@@ -316,6 +321,12 @@ async function mountEditor(markdown: string): Promise<void> {
 		},
 	});
 
+	const linkPreview = createLinkPreviewPlugin({
+		postMessage: (msg) => bridge.postMessage(msg),
+		container: workspaceRoot,
+	});
+	linkPreviewSettle = linkPreview.settleLinkPreview;
+
 	editor.editor.config((ctx) => {
 		ctx.update(historyProviderConfig.key, (value) => ({
 			...value,
@@ -339,6 +350,7 @@ async function mountEditor(markdown: string): Promise<void> {
 			},
 		}));
 		ctx.set(remarkGFMPlugin.options.key, { tablePipeAlign: false });
+		ctx.update(prosePluginsCtx, (plugins) => [...plugins, linkPreview.plugin]);
 	});
 
 	await editor.create();

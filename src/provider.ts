@@ -4,6 +4,7 @@ import { InlineCompletionService } from "./ai/inline-completion";
 import type {
 	EditMessage,
 	ExternalUpdateReason,
+	FetchLinkPreviewRequestMessage,
 	HostToWebviewMessage,
 	RequestCompletionMessage,
 	ResolveImageSrcRequestMessage,
@@ -11,6 +12,7 @@ import type {
 	SelectionResponseMessage,
 	WebviewToHostMessage,
 } from "./shared/protocol";
+import { fetchOgpMetadata } from "./ogp";
 import { safeNormalizeMarkdown } from "./sync/markdown-normalizer";
 
 interface TextBackedDocument {
@@ -315,6 +317,9 @@ export class HanshiEditorProvider
 						case "resolveImageSrcRequest":
 							await this.handleResolveImageSrc(document, message, webview);
 							return;
+						case "fetchLinkPreviewRequest":
+							await this.handleFetchLinkPreview(message, webview);
+							return;
 						case "copySelectionContext":
 							await copySelectionRefToClipboard();
 							return;
@@ -586,6 +591,34 @@ export class HanshiEditorProvider
 				type: "resolveImageSrcResult",
 				requestId: message.requestId,
 				error: resolved.message,
+			} satisfies HostToWebviewMessage);
+		}
+	}
+
+	private linkPreviewCache = new Map<string, Promise<import("./ogp").OgpMetadata>>();
+
+	private async handleFetchLinkPreview(
+		message: FetchLinkPreviewRequestMessage,
+		webview: vscode.Webview,
+	): Promise<void> {
+		try {
+			let pending = this.linkPreviewCache.get(message.url);
+			if (!pending) {
+				pending = fetchOgpMetadata(message.url);
+				this.linkPreviewCache.set(message.url, pending);
+			}
+			const metadata = await pending;
+			await webview.postMessage({
+				type: "fetchLinkPreviewResult",
+				requestId: message.requestId,
+				...metadata,
+			} satisfies HostToWebviewMessage);
+		} catch (error) {
+			this.linkPreviewCache.delete(message.url);
+			await webview.postMessage({
+				type: "fetchLinkPreviewResult",
+				requestId: message.requestId,
+				error: error instanceof Error ? error.message : String(error),
 			} satisfies HostToWebviewMessage);
 		}
 	}
