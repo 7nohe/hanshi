@@ -46,6 +46,52 @@ describe("normalizeMarkdown", () => {
 		expect(result).not.toMatch(/\| baa {2,}/);
 	});
 
+	it("preserves original table separator dash counts", () => {
+		const threeHash =
+			"| left | center | right |\n| :--- | :---: | ---: |\n| a | b | c |\n";
+		expect(normalizeMarkdown(threeHash)).toBe(threeHash);
+
+		const singleDash =
+			"| Area | Status |\n| - | - |\n| Sync | Done |\n";
+		expect(normalizeMarkdown(singleDash)).toBe(singleDash);
+	});
+
+	it("preserves literal underscores in table cells", () => {
+		const input =
+			"| Name | Value |\n| --- | --- |\n| real_world | test |\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves literal intraword underscores in paragraph text", () => {
+		const input = "real_world and foo__bar\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves literal asterisks in paragraph text", () => {
+		const input = "2 * 3 = 6\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves literal left brackets in paragraph text", () => {
+		const input = "array[0] = 1\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves literal dollar signs in paragraph text", () => {
+		const input = "Price: $100\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("continues to render emphasis, strong, links, and math correctly", () => {
+		const input = "*italic* **bold** [text](https://example.com) $E=mc^2$\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves plain URLs without autolink angle brackets", () => {
+		const input = "Visit https://example.com for info\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
 	it("preserves tight list tightness", () => {
 		const tight = "- one\n- two\n- three\n";
 		expect(normalizeMarkdown(tight)).toBe(tight);
@@ -56,13 +102,121 @@ describe("normalizeMarkdown", () => {
 		expect(normalizeMarkdown(loose)).toBe(loose);
 	});
 
+	it("preserves a list followed immediately by a heading and paragraph", () => {
+		const input =
+			"3. Finish with a concluding item.\n## Escaping\nLiteral characters that often need escaping:\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves a heading followed immediately by a paragraph", () => {
+		const input = "## Escaping\nLiteral characters that often need escaping:\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves code fences immediately before and after text", () => {
+		const input = "Before\n```ts\nconst value = 1;\n```\nAfter\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves text immediately before a blockquote", () => {
+		const input = "Before\n> quoted\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves a blockquote immediately before a heading", () => {
+		const input = "> quoted\n## After\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves existing blank lines between block nodes", () => {
+		const input = "# Heading\n\nParagraph\n\n> quote\n\n```ts\nconst value = 1;\n```\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves URL with underscores in plain text", () => {
+		const input = "See https://example.com/real_world_test page\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves link text with underscores", () => {
+		const input = "[real_world](https://example.com)\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves reference links", () => {
+		const input = "[text][ref]\n\n[ref]: https://example.com\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves images", () => {
+		const input = "![alt text](image.png)\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves inline code", () => {
+		const input = "Use `code` here\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves inline HTML", () => {
+		const input = "This is <strong>bold</strong> text\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves block HTML", () => {
+		const input = "<div>\ntest\n</div>\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves nested lists", () => {
+		const input = "- a\n  - b\n  - c\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves task lists", () => {
+		const input = "- [x] done\n- [ ] todo\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves blockquotes", () => {
+		const input = "> quoted text\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves math block", () => {
+		const input = "$$\nE=mc^2\n$$\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves YAML frontmatter", () => {
+		const input = "---\ntitle: Test\n---\n\nContent\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves paragraph then list without blank line", () => {
+		const input = "Text\n- item\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves consecutive headings without blank lines", () => {
+		const input = "# H1\n## H2\n### H3\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves mixed escaping scenarios", () => {
+		const input = "*em* and real_world and $100\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
 	it("falls back to raw markdown when normalization throws", () => {
 		const result = safeNormalizeMarkdown("abc", {
-			parse() {
-				throw new Error("boom");
-			},
-			stringify() {
-				return "";
+			processor: {
+				parse() {
+					throw new Error("boom");
+				},
+				stringify() {
+					return "";
+				},
 			},
 		});
 
