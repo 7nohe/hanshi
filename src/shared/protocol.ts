@@ -24,7 +24,8 @@ export type ExternalUpdateReason =
 	| "redo"
 	| "revert"
 	| "save-normalize"
-	| "edit";
+	| "edit"
+	| "external-edit";
 
 export interface ExternalUpdateMessage extends MarkdownSnapshot {
 	type: "externalUpdate";

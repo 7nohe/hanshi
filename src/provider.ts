@@ -38,11 +38,18 @@ class HanshiDocument implements vscode.CustomDocument, TextBackedDocument {
 	public readonly panels = new Set<vscode.WebviewPanel>();
 	private editQueue: Promise<void> = Promise.resolve();
 
+	/** Last normalized text synced from the backing TextDocument or disk. */
+	public backingText: string;
+	/** TextDocument.version at the time backingText was captured. */
+	public backingTextVersion = 0;
+
 	public constructor(
 		public readonly uri: vscode.Uri,
 		private text: string,
 		public version = 1,
-	) {}
+	) {
+		this.backingText = text;
+	}
 
 	public getText(): string {
 		return this.text;
@@ -109,6 +116,10 @@ export class HanshiEditorProvider
 	private readonly _onDidChangeContent = new vscode.EventEmitter<void>();
 	public readonly onDidChangeContent = this._onDidChangeContent.event;
 
+	/** Maps URI string → open HanshiDocument for external-edit tracking. */
+	private readonly openDocuments = new Map<string, HanshiDocument>();
+	private readonly textDocumentSubscription: vscode.Disposable;
+
 	private static activeWebview: vscode.Webview | undefined;
 	private static activeDocument: TextBackedDocument | undefined;
 	private static selectionCallbacks = new Map<
@@ -117,7 +128,17 @@ export class HanshiEditorProvider
 	>();
 	private static requestSequence = 0;
 
-	public constructor(private readonly context: vscode.ExtensionContext) {}
+	public constructor(private readonly context: vscode.ExtensionContext) {
+		this.textDocumentSubscription = vscode.workspace.onDidChangeTextDocument(
+			(event) => {
+				const document = this.openDocuments.get(event.document.uri.toString());
+				if (document) {
+					void this.handleBackingTextDocumentChange(document, event.document);
+				}
+			},
+		);
+		context.subscriptions.push(this.textDocumentSubscription);
+	}
 
 	public getActiveDocumentText(): string | undefined {
 		return HanshiEditorProvider.activeDocument?.getText();
@@ -212,7 +233,10 @@ export class HanshiEditorProvider
 		const { markdown: text } = safeNormalizeMarkdown(raw);
 		const document = new HanshiDocument(uri, text);
 
+		this.openDocuments.set(uri.toString(), document);
+
 		document.onDidDispose(() => {
+			this.openDocuments.delete(uri.toString());
 			if (HanshiEditorProvider.activeDocument === document) {
 				HanshiEditorProvider.activeDocument = undefined;
 			}
@@ -398,6 +422,7 @@ export class HanshiEditorProvider
 		const raw = await this.readDocumentContents(document.uri);
 		const { markdown: text } = safeNormalizeMarkdown(raw);
 		document.replaceText(text);
+		document.backingText = text;
 		await this.broadcastDocumentSnapshot(document, "revert");
 	}
 
@@ -468,6 +493,42 @@ export class HanshiEditorProvider
 		});
 	}
 
+	private async handleBackingTextDocumentChange(
+		document: HanshiDocument,
+		textDocument: vscode.TextDocument,
+	): Promise<void> {
+		await document.enqueueEdit(async () => {
+			if (textDocument.version <= document.backingTextVersion) {
+				return;
+			}
+
+			const { markdown: next } = safeNormalizeMarkdown(textDocument.getText());
+
+			document.backingTextVersion = textDocument.version;
+
+			if (next === document.getText()) {
+				document.backingText = next;
+				return;
+			}
+
+			// If Hanshi has unsaved local edits that diverge from the previous
+			// backing text, we have a conflict — notify but don't overwrite.
+			if (document.getText() !== document.backingText) {
+				await this.showNoticeToDocument(
+					document,
+					"This file was modified in another editor while you have unsaved changes. Save or revert to resolve.",
+				);
+				return;
+			}
+
+			// Hanshi is clean relative to backing → safe to apply
+			document.backingText = next;
+			document.replaceText(next);
+			await this.broadcastDocumentSnapshot(document, "external-edit");
+			this._onDidChangeContent.fire();
+		});
+	}
+
 	private async broadcastDocumentSnapshot(
 		document: HanshiDocument,
 		reason: ExternalUpdateReason,
@@ -506,10 +567,13 @@ export class HanshiEditorProvider
 			new TextEncoder().encode(normalized.markdown),
 		);
 
-		if (
-			target.toString() === document.uri.toString() &&
-			normalized.markdown !== raw
-		) {
+		const isSameUri = target.toString() === document.uri.toString();
+
+		if (isSameUri) {
+			document.backingText = normalized.markdown;
+		}
+
+		if (isSameUri && normalized.markdown !== raw) {
 			document.replaceText(normalized.markdown);
 			await this.broadcastDocumentSnapshot(document, "save-normalize");
 		}
