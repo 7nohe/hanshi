@@ -96,6 +96,10 @@ export interface RevealHeadingMessage {
 	index: number;
 }
 
+export interface OpenSearchMessage {
+	type: "openSearch";
+}
+
 export type HostToWebviewMessage =
 	| InitMessage
 	| ExternalUpdateMessage
@@ -109,7 +113,8 @@ export type HostToWebviewMessage =
 	| CompletionResultMessage
 	| CompletionClearedMessage
 	| GetSelectionMessage
-	| RevealHeadingMessage;
+	| RevealHeadingMessage
+	| OpenSearchMessage;
 
 export interface EditMessage extends MarkdownSnapshot {
 	type: "edit";
@@ -206,6 +211,7 @@ const HOST_TO_WEBVIEW_TYPES = new Set<string>([
 	"completionCleared",
 	"getSelection",
 	"revealHeading",
+	"openSearch",
 ]);
 
 const WEBVIEW_TO_HOST_TYPES = new Set<string>([

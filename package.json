@@ -59,6 +59,10 @@
 			{
 				"command": "hanshi.sendSelectionToChat",
 				"title": "Hanshi: Send Selection to Chat"
+			},
+			{
+				"command": "hanshi.find",
+				"title": "Hanshi: Find"
 			}
 		],
 		"languageModelTools": [
@@ -94,6 +98,12 @@
 				"command": "hanshi.copySelectionContext",
 				"key": "ctrl+shift+c",
 				"mac": "cmd+shift+c",
+				"when": "activeCustomEditorId == 'hanshi.markdownEditor'"
+			},
+			{
+				"command": "hanshi.find",
+				"key": "ctrl+f",
+				"mac": "cmd+f",
 				"when": "activeCustomEditorId == 'hanshi.markdownEditor'"
 			}
 		],

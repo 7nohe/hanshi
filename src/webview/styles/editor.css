@@ -466,6 +466,100 @@ body {
 	color: var(--hanshi-muted);
 }
 
+/* Search bar */
+.hanshi-search-bar {
+	display: none;
+	position: sticky;
+	top: 0;
+	z-index: 60;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 10px;
+	margin: 0 auto 8px;
+	max-width: 920px;
+	border: 1px solid var(--hanshi-border);
+	border-radius: 8px;
+	background: var(
+		--vscode-editorWidget-background,
+		color-mix(in srgb, var(--hanshi-fg) 10%, var(--hanshi-bg))
+	);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.hanshi-search-bar[data-visible="true"] {
+	display: flex;
+}
+
+.hanshi-search-input {
+	flex: 1;
+	min-width: 120px;
+	border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+	border-radius: 4px;
+	background: var(--hanshi-bg);
+	color: var(--hanshi-fg);
+	font: inherit;
+	font-size: 13px;
+	padding: 4px 8px;
+	outline: none;
+}
+
+.hanshi-search-input:focus {
+	border-color: var(--hanshi-accent);
+}
+
+.hanshi-search-count {
+	font-size: 12px;
+	color: var(--hanshi-muted);
+	min-width: 60px;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.hanshi-search-btn {
+	border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);
+	border-radius: 4px;
+	background: transparent;
+	color: var(--hanshi-fg);
+	cursor: pointer;
+	font: inherit;
+	font-size: 14px;
+	padding: 2px 8px;
+	line-height: 1.4;
+}
+
+.hanshi-search-btn:hover {
+	background: var(--hanshi-hover);
+}
+
+.hanshi-search-case-btn {
+	font-size: 12px;
+	font-weight: 600;
+	opacity: 0.5;
+}
+
+.hanshi-search-case-btn.active {
+	opacity: 1;
+	color: var(--hanshi-accent);
+	border-color: var(--hanshi-accent);
+}
+
+.hanshi-search-close-btn {
+	font-size: 16px;
+	border: none;
+}
+
+/* Search highlight decorations */
+.hanshi-search-match {
+	background: color-mix(in srgb, var(--hanshi-accent) 25%, transparent);
+	border-radius: 2px;
+}
+
+.hanshi-search-active {
+	background: var(--hanshi-accent);
+	color: var(--hanshi-bg);
+	border-radius: 2px;
+}
+
 .hanshi-mermaid-preview {
 	margin: 12px 0 20px;
 	border: 1px solid color-mix(in srgb, var(--hanshi-border) 80%, transparent);

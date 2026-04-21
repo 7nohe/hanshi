@@ -65,6 +65,14 @@ export function activate(context: vscode.ExtensionContext): void {
 				} satisfies HostToWebviewMessage);
 			}
 		}),
+		vscode.commands.registerCommand("hanshi.find", () => {
+			const webview = provider.getActiveWebview();
+			if (webview) {
+				void webview.postMessage({
+					type: "openSearch",
+				} satisfies HostToWebviewMessage);
+			}
+		}),
 		vscode.window.createTreeView("hanshi.outline", {
 			treeDataProvider: outline,
 			showCollapseAll: true,

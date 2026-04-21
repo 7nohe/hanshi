@@ -23,6 +23,7 @@ import {
 import { createImageMarkdown } from "./markdown";
 import { renderMermaidPreview } from "./plugins/mermaid-block";
 import { createLinkPreviewPlugin } from "./plugins/link-preview";
+import { createSearchPlugin, type SearchController } from "./search";
 import { createSyncPlugin, type SyncPluginHandle } from "./plugins/sync-plugin";
 
 const COPY_REF_ICON =
@@ -44,6 +45,7 @@ let editor: Crepe | undefined;
 let syncPlugin: SyncPluginHandle | undefined;
 let linkPreviewSettle: ((msg: import("../shared/protocol").FetchLinkPreviewResultMessage) => void) | undefined;
 let completionController: CompletionController | undefined;
+let searchController: SearchController | undefined;
 let currentVersion = 0;
 let currentEditable = true;
 let currentCompletionsEnabled = true;
@@ -97,6 +99,7 @@ frontmatterToggle.addEventListener("click", () => {
 editorRoot.addEventListener("focusin", markEditorInteraction, true);
 editorRoot.addEventListener("keydown", markEditorInteraction, true);
 editorRoot.addEventListener("keydown", handleHistoryKeydown, true);
+editorRoot.addEventListener("keydown", handleSearchKeydown, true);
 editorRoot.addEventListener(
 	"beforeinput",
 	handleHistoryBeforeInput as EventListener,
@@ -204,6 +207,13 @@ async function handleMessage(message: HostToWebviewMessage): Promise<void> {
 		case "revealHeading":
 			revealHeadingByIndex(message.index);
 			return;
+		case "openSearch":
+			if (searchController?.isOpen()) {
+				searchController.close();
+			} else {
+				searchController?.open();
+			}
+			return;
 	}
 }
 
@@ -279,6 +289,8 @@ async function mountEditor(markdown: string): Promise<void> {
 		syncPlugin?.dispose();
 		completionController?.dispose();
 		completionController = undefined;
+		searchController?.dispose();
+		searchController = undefined;
 		await editor.destroy();
 	}
 
@@ -326,6 +338,10 @@ async function mountEditor(markdown: string): Promise<void> {
 	});
 	linkPreviewSettle = linkPreview.settleLinkPreview;
 
+	const search = createSearchPlugin();
+	searchController = search.controller;
+	searchController.mount(workspaceRoot);
+
 	editor.editor.config((ctx) => {
 		ctx.update(historyProviderConfig.key, (value) => ({
 			...value,
@@ -349,7 +365,7 @@ async function mountEditor(markdown: string): Promise<void> {
 			},
 		}));
 		ctx.set(remarkGFMPlugin.options.key, { tablePipeAlign: false });
-		ctx.update(prosePluginsCtx, (plugins) => [...plugins, linkPreview.plugin]);
+		ctx.update(prosePluginsCtx, (plugins) => [...plugins, linkPreview.plugin, search.plugin]);
 	});
 
 	await editor.create();
@@ -686,6 +702,26 @@ function handleHistoryKeydown(event: KeyboardEvent): void {
 		type: "requestHistory",
 		direction: isUndo ? "undo" : "redo",
 	});
+}
+
+function handleSearchKeydown(event: KeyboardEvent): void {
+	if (event.defaultPrevented) return;
+
+	const isFind =
+		event.key.toLowerCase() === "f" &&
+		(event.metaKey || event.ctrlKey) &&
+		!event.altKey &&
+		!event.shiftKey;
+
+	if (!isFind) return;
+
+	event.preventDefault();
+	event.stopPropagation();
+	if (searchController?.isOpen()) {
+		searchController.close();
+	} else {
+		searchController?.open();
+	}
 }
 
 function handleHistoryBeforeInput(event: InputEvent): void {
