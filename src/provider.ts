@@ -465,7 +465,9 @@ export class HanshiEditorProvider
 			}
 
 			const previous = document.getText();
-			const { markdown: next } = safeNormalizeMarkdown(message.markdown);
+			const { markdown: next } = safeNormalizeMarkdown(message.markdown, {
+				reference: previous,
+			});
 
 			if (previous === next) {
 				return;

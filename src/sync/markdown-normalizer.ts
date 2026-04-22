@@ -7,7 +7,9 @@ import remarkStringify from "remark-stringify";
 import type { Link, Parents, Text } from "mdast";
 import type { Info, State } from "mdast-util-to-markdown";
 import { unified } from "unified";
+import { restoreAutolinkBrackets } from "../shared/autolink-restorer";
 import { restoreBlankLineBoundaries } from "../shared/blank-line-restorer";
+import { restoreEscapes } from "../shared/escape-restorer";
 import { restoreTableSeparators } from "../shared/table-normalizer";
 
 // Private-use sentinels that protect literal characters from remark's escaping.
@@ -85,8 +87,14 @@ export function safeNormalizeMarkdown(
 }
 
 function restoreFormatting(normalized: string, reference: string): string {
-	return restoreTableSeparators(
-		restoreBlankLineBoundaries(normalized, reference),
+	return restoreEscapes(
+		restoreAutolinkBrackets(
+			restoreTableSeparators(
+				restoreBlankLineBoundaries(normalized, reference),
+				reference,
+			),
+			reference,
+		),
 		reference,
 	);
 }

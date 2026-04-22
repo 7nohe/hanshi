@@ -30,6 +30,9 @@ describe("normalizeMarkdown", () => {
 			"- [x] done\n- [ ] todo\n",
 			"- tight 1\n- tight 2\n  - nested\n",
 			"- loose 1\n\n- loose 2\n",
+			"an autolink <https://example.com/docs>\n",
+			"bare https://example.com and <https://other.com>\n",
+			"- \\*asterisk\\*\n- \\[brackets\\]\n- \\`backticks\\`\n",
 		];
 
 		for (const input of inputs) {
@@ -89,6 +92,23 @@ describe("normalizeMarkdown", () => {
 
 	it("preserves plain URLs without autolink angle brackets", () => {
 		const input = "Visit https://example.com for info\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves autolink angle brackets", () => {
+		const input = "an autolink <https://example.com/docs>\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves multiple autolinks with angle brackets", () => {
+		const input =
+			"See <https://example.com> and <https://other.com/path>\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves mixed bare URLs and autolinks", () => {
+		const input =
+			"Bare https://example.com and autolink <https://other.com>\n";
 		expect(normalizeMarkdown(input)).toBe(input);
 	});
 
@@ -206,6 +226,65 @@ describe("normalizeMarkdown", () => {
 	it("preserves mixed escaping scenarios", () => {
 		const input = "*em* and real_world and $100\n";
 		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves explicit backslash escapes for asterisks", () => {
+		const input = "- \\*asterisk\\*\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves explicit backslash escapes for brackets", () => {
+		const input = "- \\[brackets\\]\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves explicit backslash escapes for backticks", () => {
+		const input = "- \\`backticks\\`\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves all explicit backslash escapes in a list", () => {
+		const input =
+			"- \\*asterisk\\*\n- \\[brackets\\]\n- \\`backticks\\`\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("preserves escaped punctuation in paragraph text", () => {
+		const input = "Literal \\*stars\\* and \\[brackets\\] here\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("does not alter lines without escapes when restoring", () => {
+		const input =
+			"Normal text\n- \\*escaped\\*\n- plain item\n";
+		expect(normalizeMarkdown(input)).toBe(input);
+	});
+
+	it("restores explicit backslash escapes from reference markdown", () => {
+		const reference =
+			"- \\*asterisk\\*\n- \\[brackets\\]\n- \\`backticks\\`\n";
+		// Simulate what the webview might send after re-serialization
+		const edited =
+			"- *asterisk*\n- [brackets]\n- \\`backticks\\`\n";
+
+		const result = safeNormalizeMarkdown(edited, { reference });
+
+		expect(result.didFallback).toBe(false);
+		expect(result.markdown).toBe(reference);
+	});
+
+	it("restores table separator dash counts from reference markdown", () => {
+		const reference =
+			"| left | center | right |\n| :--- | :---: | ---: |\n| a | b | c |\n";
+		// Simulate what Milkdown/remark might shorten separators to
+		const edited =
+			"| left | center | right |\n| :- | :-: | -: |\n| alpha | beta | gamma |\n";
+
+		const result = safeNormalizeMarkdown(edited, { reference });
+
+		expect(result.didFallback).toBe(false);
+		// Separators should be restored to match the reference's dash counts
+		expect(result.markdown).toContain("| :--- | :---: | ---: |");
 	});
 
 	it("falls back to raw markdown when normalization throws", () => {
