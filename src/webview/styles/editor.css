@@ -308,9 +308,21 @@ body {
 	height: auto;
 }
 
+#editor .milkdown .milkdown-table-block table {
+	width: 100%;
+	table-layout: fixed;
+}
+
 #editor .milkdown .milkdown-table-block th,
 #editor .milkdown .milkdown-table-block td {
 	border-color: var(--hanshi-border);
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+#editor .milkdown .milkdown-table-block th code,
+#editor .milkdown .milkdown-table-block td code {
+	display: inline;
 }
 
 .hanshi-link-preview {
