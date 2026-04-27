@@ -63,6 +63,10 @@
 			{
 				"command": "hanshi.find",
 				"title": "Hanshi: Find"
+			},
+			{
+				"command": "hanshi.exportPdf",
+				"title": "Hanshi: Export to PDF"
 			}
 		],
 		"languageModelTools": [
@@ -90,6 +94,17 @@
 					"command": "hanshi.open",
 					"when": "resourceLangId == markdown && activeEditorId != 'hanshi.markdownEditor'",
 					"group": "navigation"
+				},
+				{
+					"command": "hanshi.exportPdf",
+					"when": "activeCustomEditorId == 'hanshi.markdownEditor'",
+					"group": "1_export"
+				}
+			],
+			"commandPalette": [
+				{
+					"command": "hanshi.exportPdf",
+					"when": "activeCustomEditorId == 'hanshi.markdownEditor'"
 				}
 			]
 		},
@@ -149,12 +164,18 @@
 		"@vscode/test-electron": "^2.4.1",
 		"esbuild": "^0.25.3",
 		"glob": "^13.0.6",
+		"katex": "^0.16.45",
 		"mermaid": "^11.6.0",
 		"mocha": "^11.7.5",
+		"rehype-katex": "^7.0.1",
+		"rehype-raw": "^7.0.0",
+		"rehype-sanitize": "^6.0.0",
+		"rehype-stringify": "^10.0.1",
 		"remark-frontmatter": "^5.0.0",
 		"remark-gfm": "^4.0.1",
 		"remark-math": "^6.0.0",
 		"remark-parse": "^11.0.0",
+		"remark-rehype": "^11.1.2",
 		"remark-stringify": "^11.0.0",
 		"typescript": "^5.8.3",
 		"unified": "^11.0.5",

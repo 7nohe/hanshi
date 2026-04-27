@@ -1,3 +1,5 @@
+import { escapeHtml } from "../../shared/html-utils";
+
 let mermaidModule: typeof import("mermaid") | undefined;
 let nextRenderId = 0;
 let delegationInstalled = false;
@@ -254,11 +256,3 @@ function getThemeToken(name: string, fallback: string): string {
 	);
 }
 
-function escapeHtml(value: string): string {
-	return value
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&#39;");
-}

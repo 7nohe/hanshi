@@ -38,17 +38,36 @@ const webviewConfig = {
 	},
 };
 
+/** @type {import('esbuild').BuildOptions} */
+const exportRendererConfig = {
+	entryPoints: ["src/export/renderer/index.ts"],
+	bundle: true,
+	format: "iife",
+	platform: "browser",
+	target: "chrome114",
+	outfile: "dist/export/index.js",
+	sourcemap: true,
+	minify: !watch,
+	logLevel: "info",
+};
+
 async function build() {
 	if (watch) {
 		const extensionContext = await esbuild.context(extensionConfig);
 		const webviewContext = await esbuild.context(webviewConfig);
-		await Promise.all([extensionContext.watch(), webviewContext.watch()]);
+		const exportContext = await esbuild.context(exportRendererConfig);
+		await Promise.all([
+			extensionContext.watch(),
+			webviewContext.watch(),
+			exportContext.watch(),
+		]);
 		return;
 	}
 
 	await Promise.all([
 		esbuild.build(extensionConfig),
 		esbuild.build(webviewConfig),
+		esbuild.build(exportRendererConfig),
 	]);
 }
 

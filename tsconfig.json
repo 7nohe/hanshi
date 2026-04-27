@@ -13,5 +13,5 @@
 		"types": ["node", "vscode"]
 	},
 	"include": ["src/**/*.ts"],
-	"exclude": ["src/webview/**/*", "test/**/*"]
+	"exclude": ["src/webview/**/*", "src/export/renderer/**/*", "test/**/*"]
 }

@@ -11,5 +11,9 @@
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["src/webview/**/*.ts", "src/shared/**/*.ts"]
+	"include": [
+		"src/webview/**/*.ts",
+		"src/shared/**/*.ts",
+		"src/export/renderer/**/*.ts"
+	]
 }

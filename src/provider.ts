@@ -144,6 +144,10 @@ export class HanshiEditorProvider
 		return HanshiEditorProvider.activeDocument?.getText();
 	}
 
+	public getActiveDocument(): TextBackedDocument | undefined {
+		return HanshiEditorProvider.activeDocument;
+	}
+
 	public getActiveWebview(): vscode.Webview | undefined {
 		return HanshiEditorProvider.activeWebview;
 	}

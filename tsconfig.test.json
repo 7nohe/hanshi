@@ -13,5 +13,5 @@
 		"types": ["node"]
 	},
 	"include": ["test/**/*.ts", "src/**/*.ts"],
-	"exclude": ["src/webview/**/*"]
+	"exclude": ["src/webview/**/*", "src/export/renderer/**/*"]
 }

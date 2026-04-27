@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { registerChatTool } from "./ai/chat-tool";
+import { exportToPdf } from "./export/export-pdf";
 import { HanshiOutlineProvider } from "./outline";
 import {
 	copySelectionRefToClipboard,
@@ -72,6 +73,9 @@ export function activate(context: vscode.ExtensionContext): void {
 					type: "openSearch",
 				} satisfies HostToWebviewMessage);
 			}
+		}),
+		vscode.commands.registerCommand("hanshi.exportPdf", async () => {
+			await exportToPdf(context, provider.getActiveDocument());
 		}),
 		vscode.window.createTreeView("hanshi.outline", {
 			treeDataProvider: outline,
